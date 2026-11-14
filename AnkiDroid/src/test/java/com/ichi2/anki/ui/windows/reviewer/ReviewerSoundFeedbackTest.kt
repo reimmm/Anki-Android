@@ -2,6 +2,7 @@
 
 package com.ichi2.anki.ui.windows.reviewer
 
+import android.media.AudioAttributes
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import anki.scheduler.CardAnswer.Rating
 import org.junit.Test
@@ -12,6 +13,13 @@ import kotlin.test.assertTrue
 
 @RunWith(AndroidJUnit4::class)
 class ReviewerSoundFeedbackTest {
+    @Test
+    fun `feedback audio uses media stream attributes`() {
+        val attributes = ReviewerSoundFeedback.feedbackAudioAttributes
+        assertEquals(AudioAttributes.USAGE_MEDIA, attributes.usage)
+        assertEquals(AudioAttributes.CONTENT_TYPE_MUSIC, attributes.contentType)
+    }
+
     @Test
     fun `synthesizeToneSamples produces expected length and faded edges`() {
         val samples = ReviewerSoundFeedback.synthesizeToneSamples(frequencyHz = 440.0, durationMs = 100)

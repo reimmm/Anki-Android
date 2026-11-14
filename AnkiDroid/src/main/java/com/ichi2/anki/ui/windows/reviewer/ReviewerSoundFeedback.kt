@@ -80,7 +80,7 @@ class ReviewerSoundFeedback {
     private fun playTrack(track: AudioTrack?) {
         if (track == null) return
         try {
-            if (track.playState == AudioTrack.PLAYSTATE_PLAYING) {
+            if (track.playState != AudioTrack.PLAYSTATE_STOPPED) {
                 track.stop()
             }
             track.reloadStaticData()
@@ -94,12 +94,6 @@ class ReviewerSoundFeedback {
         if (isRobolectric) return null
         val samples = synthesizeSegments(segments)
         val bufferSizeBytes = samples.size * Short.SIZE_BYTES
-        val attributes =
-            AudioAttributes
-                .Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
         val format =
             AudioFormat
                 .Builder()
@@ -110,7 +104,7 @@ class ReviewerSoundFeedback {
         return try {
             AudioTrack
                 .Builder()
-                .setAudioAttributes(attributes)
+                .setAudioAttributes(feedbackAudioAttributes)
                 .setAudioFormat(format)
                 .setTransferMode(AudioTrack.MODE_STATIC)
                 .setBufferSizeInBytes(bufferSizeBytes)
@@ -120,7 +114,12 @@ class ReviewerSoundFeedback {
                         release()
                         return null
                     }
-                    write(samples, 0, samples.size)
+                    val written = write(samples, 0, samples.size)
+                    if (written <= 0) {
+                        Timber.w("Failed to write samples to AudioTrack: %d", written)
+                        release()
+                        return null
+                    }
                     allTracks.add(this)
                 }
         } catch (e: RuntimeException) {
@@ -136,8 +135,15 @@ class ReviewerSoundFeedback {
 
     companion object {
         private const val SAMPLE_RATE = 44100
-        private const val AMPLITUDE = 0.22
+        private const val AMPLITUDE = 0.55
         private const val FADE_MS = 8
+
+        internal val feedbackAudioAttributes: AudioAttributes =
+            AudioAttributes
+                .Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build()
 
         internal fun synthesizeToneSamples(
             frequencyHz: Double,
