@@ -112,6 +112,26 @@ class AutomaticAnswerTest {
         assertThat("call not executed due to disable", answerValue.questionShown, equalTo(false))
     }
 
+    @Test
+    fun onDisplayQuestionStopsShowQuestionTask() {
+        val answerValue = AutoAnswerMock()
+        val answer = validAnswer(answerValue)
+        answer.scheduleAutomaticDisplayQuestion()
+        answer.onDisplayQuestion()
+        waitForTaskCompletion()
+        assertThat("question should not be shown after onDisplayQuestion", answerValue.questionShown, equalTo(false))
+    }
+
+    @Test
+    fun onDisplayAnswerStopsShowAnswerTask() {
+        val answerValue = AutoAnswerMock()
+        val answer = validAnswer(answerValue)
+        answer.scheduleAutomaticDisplayAnswer()
+        answer.onDisplayAnswer()
+        waitForTaskCompletion()
+        assertThat("answer should not be shown after onDisplayAnswer", answerValue.answerShown, equalTo(false))
+    }
+
     private fun waitForTaskCompletion() {
         runUiThreadTasksIncludingDelayedTasks()
     }

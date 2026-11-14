@@ -117,6 +117,7 @@ class AutomaticAnswer(
             return
         }
         Timber.i("Automatically showing question in %dms", delay)
+        timeoutHandler.removeCallbacks(showQuestionTask)
         timeoutHandler.postDelayed(showQuestionTask, delay)
     }
 
@@ -127,6 +128,7 @@ class AutomaticAnswer(
             return
         }
         Timber.i("Automatically showing answer in %dms", delay)
+        timeoutHandler.removeCallbacks(showAnswerTask)
         timeoutHandler.postDelayed(showAnswerTask, delay)
     }
 
@@ -165,18 +167,18 @@ class AutomaticAnswer(
 
     /** Stop any "Automatic show answer" tasks in order to avoid race conditions */
     fun onDisplayQuestion() {
-        if (!settings.autoAdvanceIfShowingQuestion) return
         hasPlayedSounds = false
 
         stopShowAnswerTask()
+        stopShowQuestionTask()
     }
 
     /** Stop any "Automatic show question" tasks in order to avoid race conditions */
     fun onDisplayAnswer() {
-        if (!settings.autoAdvanceIfShowingAnswer) return
         hasPlayedSounds = false
 
         stopShowQuestionTask()
+        stopShowAnswerTask()
     }
 
     // region TODO: These attempt to stop a race condition between a manual answer and the automated answer
