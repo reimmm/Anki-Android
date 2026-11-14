@@ -8,8 +8,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import anki.scheduler.CardAnswer.Rating
 import app.cash.turbine.test
 import com.ichi2.anki.RobolectricTest
+import com.ichi2.anki.preferences.reviewer.ViewerAction
 import com.ichi2.anki.utils.ext.cardStateCustomizer
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -17,6 +20,7 @@ import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 @RunWith(AndroidJUnit4::class)
 class ReviewerViewModelTest : RobolectricTest() {
@@ -121,5 +125,56 @@ class ReviewerViewModelTest : RobolectricTest() {
                 advanceUntilIdle()
                 assertEquals(1, col.getCard(card.id).reps)
             }
+        }
+
+    @Test
+    fun `answering and undoing resets auto advance timer`() =
+        runTest {
+            val card1 = addBasicNote("front1", "back1").firstCard()
+            val card2 = addBasicNote("front2", "back2").firstCard()
+            updateDeckConfig(col.decks.selected()) {
+                secondsToShowQuestion = 5.0
+                secondsToShowAnswer = 5.0
+            }
+            val viewModel = ReviewerViewModel(SavedStateHandle()).also { viewModelStore.put("reviewer", it) }
+
+            viewModel.onPageFinished(false)
+            runCurrent()
+            viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
+            runCurrent()
+
+            advanceTimeBy(3.seconds)
+            runCurrent()
+
+            viewModel.onShowAnswer()
+            runCurrent()
+            viewModel.answerCard(Rating.GOOD)
+            runCurrent()
+            assertEquals(card2.id, viewModel.getCardId())
+            assertFalse(viewModel.showingAnswer.value)
+
+            advanceTimeBy(3.seconds)
+            runCurrent()
+            assertFalse(viewModel.showingAnswer.value)
+
+            viewModel.onShowAnswer()
+            runCurrent()
+            assertTrue(viewModel.showingAnswer.value)
+
+            advanceTimeBy(3.seconds)
+            runCurrent()
+
+            viewModel.executeAction(ViewerAction.UNDO)
+            runCurrent()
+            assertEquals(card1.id, viewModel.getCardId())
+            assertFalse(viewModel.showingAnswer.value)
+
+            advanceTimeBy(3.seconds)
+            runCurrent()
+            assertFalse(viewModel.showingAnswer.value)
+
+            advanceTimeBy(2.seconds)
+            runCurrent()
+            assertTrue(viewModel.showingAnswer.value)
         }
 }

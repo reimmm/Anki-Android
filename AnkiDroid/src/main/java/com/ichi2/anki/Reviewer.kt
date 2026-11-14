@@ -755,7 +755,11 @@ open class Reviewer :
     }
 
     fun redo() {
-        launchCatchingTask { redoAndShowSnackbar(ACTION_SNACKBAR_TIME) }
+        launchCatchingTask {
+            automaticAnswer.onDisplayQuestion()
+            stopCardMediaPlayer()
+            redoAndShowSnackbar(ACTION_SNACKBAR_TIME)
+        }
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {

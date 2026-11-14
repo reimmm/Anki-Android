@@ -47,6 +47,7 @@ import com.ichi2.testutils.common.OS
 import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertFalse
 import junit.framework.TestCase.assertTrue
+import kotlinx.coroutines.test.advanceUntilIdle
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.empty
@@ -59,6 +60,7 @@ import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows
+import org.robolectric.shadows.ShadowLooper
 import timber.log.Timber
 import kotlin.test.junit5.JUnit5Asserter.assertNotNull
 
@@ -567,6 +569,35 @@ class ReviewerTest : RobolectricTest() {
             return visibleButtons
         }
     }
+
+    @Test
+    fun `undo stops automatic answer timer and ignores stale media completion`() =
+        runTest {
+            updateDeckConfig(Consts.DEFAULT_DECK_ID) {
+                secondsToShowQuestion = 5.0
+                secondsToShowAnswer = 5.0
+                autoplay = true
+            }
+            val card1 = addBasicNote("front1", "back1").firstCard()
+            val card2 = addBasicNote("front2", "back2").firstCard()
+            val reviewer = startReviewer()
+            reviewer.automaticAnswer.enable()
+
+            reviewer.displayCardAnswer()
+            reviewer.answerCard(Rating.GOOD)
+            advanceUntilIdle()
+            ShadowLooper.shadowMainLooper().idle()
+            assertEquals(card2.id, reviewer.currentCard!!.id)
+
+            reviewer.onMediaGroupCompleted()
+            reviewer.undo().join()
+            advanceUntilIdle()
+            ShadowLooper.shadowMainLooper().idle()
+
+            assertEquals(card1.id, reviewer.currentCard!!.id)
+            assertFalse(reviewer.isDisplayingAnswer)
+            assertTrue(reviewer.automaticAnswer.timeoutHandler.hasMessages(0))
+        }
 
     companion object {
         fun startReviewer(testClass: RobolectricTest): Reviewer = startReviewer(testClass, Reviewer::class.java)
