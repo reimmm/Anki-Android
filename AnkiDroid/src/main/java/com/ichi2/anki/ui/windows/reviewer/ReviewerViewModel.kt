@@ -209,6 +209,7 @@ class ReviewerViewModel(
      */
     private suspend fun showAnswerInternal() {
         Timber.v("ReviewerViewModel::onShowAnswer")
+        autoAdvance.cancelQuestionAndAnswerActionJobs()
         mutationSignal.await()
 
         val typedAnswerResult = CompletableDeferred<String>()
@@ -350,7 +351,7 @@ class ReviewerViewModel(
     private suspend fun deleteNote() {
         val cardId = currentCard.await().id
         val noteCount =
-            undoableOp {
+            undoableOp(handler = this) {
                 removeNotes(cardIds = listOf(cardId))
             }.count
         actionFeedbackFlow.emit(TR.browsingCardsDeleted(noteCount))
@@ -360,7 +361,7 @@ class ReviewerViewModel(
     private suspend fun buryCard() {
         val cardId = currentCard.await().id
         val noteCount =
-            undoableOp {
+            undoableOp(handler = this) {
                 sched.buryCards(cids = listOf(cardId))
             }.count
         actionFeedbackFlow.emit(TR.studyingCardsBuried(noteCount))
@@ -370,7 +371,7 @@ class ReviewerViewModel(
     private suspend fun buryNote() {
         val noteId = currentCard.await().nid
         val noteCount =
-            undoableOp {
+            undoableOp(handler = this) {
                 sched.buryNotes(nids = listOf(noteId))
             }.count
         actionFeedbackFlow.emit(TR.studyingCardsBuried(noteCount))
@@ -379,7 +380,7 @@ class ReviewerViewModel(
 
     private suspend fun suspendCard() {
         val cardId = currentCard.await().id
-        undoableOp {
+        undoableOp(handler = this) {
             sched.suspendCards(ids = listOf(cardId))
         }.count
         actionFeedbackFlow.emit(TR.studyingCardSuspended())
@@ -388,7 +389,7 @@ class ReviewerViewModel(
 
     private suspend fun suspendNote() {
         val noteId = currentCard.await().nid
-        undoableOp {
+        undoableOp(handler = this) {
             sched.suspendNotes(ids = listOf(noteId))
         }
         actionFeedbackFlow.emit(TR.studyingNoteSuspended())
@@ -397,11 +398,13 @@ class ReviewerViewModel(
 
     private suspend fun undo() {
         Timber.v("ReviewerViewModel::undo")
+        autoAdvance.cancelQuestionAndAnswerActionJobs()
         actionFeedbackFlow.emit(tryUndo())
     }
 
     private suspend fun redo() {
         Timber.v("ReviewerViewModel::redo")
+        autoAdvance.cancelQuestionAndAnswerActionJobs()
         actionFeedbackFlow.emit(tryRedo())
     }
 
@@ -563,6 +566,9 @@ class ReviewerViewModel(
     private suspend fun loadAndPlayMedia(side: CardSide) {
         Timber.v("ReviewerViewModel::loadAndPlaySounds")
         cardMediaPlayer.loadCardAvTags(currentCard.await())
+        if (autoAdvance.shouldWaitForAudio()) {
+            autoAdvance.cancelQuestionAndAnswerActionJobs()
+        }
         cardMediaPlayer.autoplayAllForSide(side)
     }
 
@@ -822,23 +828,25 @@ class ReviewerViewModel(
 
             if (handler == this) return@launchCatchingIO
 
-            when {
-                changes.studyQueues -> updateCurrentCard()
-                changes.noteText -> {
-                    val card = currentCard.await()
-                    withCol { card.load(this) }
-                    cardMediaPlayer.loadCardAvTags(card)
-                    updateMarkIcon()
-                    if (showingAnswer.value) {
-                        showAnswer()
-                    } else {
-                        showQuestion()
+            actionsMutex.withLock {
+                when {
+                    changes.studyQueues -> updateCurrentCard()
+                    changes.noteText -> {
+                        val card = currentCard.await()
+                        withCol { card.load(this) }
+                        cardMediaPlayer.loadCardAvTags(card)
+                        updateMarkIcon()
+                        if (showingAnswer.value) {
+                            showAnswer()
+                        } else {
+                            showQuestion()
+                        }
                     }
-                }
-                changes.card -> {
-                    val card = currentCard.await()
-                    withCol { card.load(this) }
-                    updateFlagIcon()
+                    changes.card -> {
+                        val card = currentCard.await()
+                        withCol { card.load(this) }
+                        updateFlagIcon()
+                    }
                 }
             }
         }
