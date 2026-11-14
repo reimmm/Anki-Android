@@ -26,7 +26,7 @@ data class AutoAdvanceSettings(
                 answerAction = config.answerAction,
                 durationToShowQuestionFor = config.secondsToShowQuestion.toDuration(DurationUnit.SECONDS),
                 durationToShowAnswerFor = config.secondsToShowAnswer.toDuration(DurationUnit.SECONDS),
-                waitForAudio = config.waitForAudio,
+                waitForAudio = config.waitForAudio && config.autoplay,
             )
         }
     }

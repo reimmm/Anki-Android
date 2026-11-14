@@ -14,6 +14,7 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -197,5 +198,65 @@ class AutoAdvanceTest {
             coVerify(exactly = 0) { listener.onAutoAdvanceAction(any()) }
             advanceTimeBy(2.seconds)
             coVerify(exactly = 1) { listener.onAutoAdvanceAction(AnswerAction.ANSWER_GOOD) }
+        }
+
+    @Test
+    fun `calling onShowQuestion again resets question timer`() =
+        testScope.runTest {
+            autoAdvance = createAutoAdvance()
+            autoAdvance.isEnabled = true
+            testScheduler.advanceUntilIdle()
+
+            autoAdvance.onShowQuestion()
+            advanceTimeBy(3.seconds)
+
+            autoAdvance.onShowQuestion()
+            advanceTimeBy(3.seconds)
+
+            coVerify(exactly = 0) { listener.onAutoAdvanceAction(any()) }
+
+            advanceTimeBy(3.seconds)
+            coVerify(exactly = 1) { listener.onAutoAdvanceAction(QuestionAction.SHOW_ANSWER) }
+        }
+
+    @Test
+    fun `calling onShowAnswer again resets answer timer`() =
+        testScope.runTest {
+            autoAdvance = createAutoAdvance()
+            autoAdvance.isEnabled = true
+            testScheduler.advanceUntilIdle()
+
+            autoAdvance.onShowAnswer()
+            advanceTimeBy(3.seconds)
+
+            autoAdvance.onShowAnswer()
+            advanceTimeBy(3.seconds)
+
+            coVerify(exactly = 0) { listener.onAutoAdvanceAction(any()) }
+
+            advanceTimeBy(3.seconds)
+            coVerify(exactly = 1) { listener.onAutoAdvanceAction(AnswerAction.ANSWER_GOOD) }
+        }
+
+    @Test
+    fun `onShowQuestion does not schedule timer if card changes while awaiting settings`() =
+        testScope.runTest {
+            val firstCardSettings = CompletableDeferred<AutoAdvanceSettings>()
+            val secondCard = mockk<Card> { every { currentDeckId() } returns 2L }
+            coEvery { AutoAdvanceSettings.createInstance(1L) } coAnswers { firstCardSettings.await() }
+            coEvery { AutoAdvanceSettings.createInstance(2L) } returns defaultSettings
+
+            autoAdvance = createAutoAdvance()
+            autoAdvance.isEnabled = true
+
+            val showJob = launch { autoAdvance.onShowQuestion() }
+            testScheduler.runCurrent()
+
+            autoAdvance.onCardChange(secondCard)
+            firstCardSettings.complete(defaultSettings.copy(durationToShowQuestionFor = 1.seconds))
+            showJob.join()
+
+            advanceTimeBy(2.seconds)
+            coVerify(exactly = 0) { listener.onAutoAdvanceAction(any()) }
         }
 }
