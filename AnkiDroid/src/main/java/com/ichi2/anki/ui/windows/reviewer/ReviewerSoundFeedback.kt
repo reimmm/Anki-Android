@@ -8,92 +8,128 @@ import android.media.AudioTrack
 import anki.scheduler.CardAnswer.Rating
 import com.ichi2.anki.common.utils.android.isRobolectric
 import timber.log.Timber
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import kotlin.math.PI
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
 class ReviewerSoundFeedback {
-    private val autoAdvanceOnTrack by lazy {
-        createToneTrack(
-            ToneSegment(frequencyHz = 523.25, durationMs = 55),
-            ToneSegment(frequencyHz = 659.25, durationMs = 55),
-            ToneSegment(frequencyHz = 783.99, durationMs = 95),
+    private val autoAdvanceOnSamples by lazy {
+        synthesizeSegments(
+            arrayOf(
+                ToneSegment(frequencyHz = 523.25, durationMs = 65),
+                ToneSegment(frequencyHz = 659.25, durationMs = 65),
+                ToneSegment(frequencyHz = 783.99, durationMs = 110),
+            ),
         )
     }
 
-    private val autoAdvanceOffTrack by lazy {
-        createToneTrack(
-            ToneSegment(frequencyHz = 783.99, durationMs = 55),
-            ToneSegment(frequencyHz = 659.25, durationMs = 55),
-            ToneSegment(frequencyHz = 523.25, durationMs = 95),
+    private val autoAdvanceOffSamples by lazy {
+        synthesizeSegments(
+            arrayOf(
+                ToneSegment(frequencyHz = 783.99, durationMs = 65),
+                ToneSegment(frequencyHz = 659.25, durationMs = 65),
+                ToneSegment(frequencyHz = 523.25, durationMs = 110),
+            ),
         )
     }
 
-    private val againTrack by lazy {
-        createToneTrack(
-            ToneSegment(frequencyHz = 329.63, durationMs = 65),
-            ToneSegment(frequencyHz = 246.94, durationMs = 95),
+    private val againSamples by lazy {
+        synthesizeSegments(
+            arrayOf(
+                ToneSegment(frequencyHz = 329.63, durationMs = 75),
+                ToneSegment(frequencyHz = 246.94, durationMs = 115),
+            ),
         )
     }
 
-    private val hardTrack by lazy {
-        createToneTrack(ToneSegment(frequencyHz = 392.00, durationMs = 90))
+    private val hardSamples by lazy {
+        synthesizeSegments(arrayOf(ToneSegment(frequencyHz = 392.00, durationMs = 120)))
     }
 
-    private val goodTrack by lazy {
-        createToneTrack(ToneSegment(frequencyHz = 587.33, durationMs = 90))
+    private val goodSamples by lazy {
+        synthesizeSegments(arrayOf(ToneSegment(frequencyHz = 587.33, durationMs = 120)))
     }
 
-    private val easyTrack by lazy {
-        createToneTrack(
-            ToneSegment(frequencyHz = 587.33, durationMs = 60),
-            ToneSegment(frequencyHz = 880.00, durationMs = 95),
+    private val easySamples by lazy {
+        synthesizeSegments(
+            arrayOf(
+                ToneSegment(frequencyHz = 587.33, durationMs = 70),
+                ToneSegment(frequencyHz = 880.00, durationMs = 115),
+            ),
         )
     }
+
+    private val minBufferBytes: Int by lazy {
+        if (isRobolectric) {
+            0
+        } else {
+            AudioTrack.getMinBufferSize(
+                SAMPLE_RATE,
+                AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+            )
+        }
+    }
+
+    private val executor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "ReviewerSoundFeedback").apply { isDaemon = true }
+        }
+
+    @Volatile
+    private var isReleased = false
+
+    // Accessed exclusively on executor
+    private var activeTrack: AudioTrack? = null
 
     fun playAutoAdvanceToggled(isEnabled: Boolean) {
-        playTrack(if (isEnabled) autoAdvanceOnTrack else autoAdvanceOffTrack)
+        playSamples(if (isEnabled) autoAdvanceOnSamples else autoAdvanceOffSamples)
     }
 
     fun playAnswerFeedback(rating: Rating) {
-        val track =
+        val samples =
             when (rating) {
-                Rating.AGAIN -> againTrack
-                Rating.HARD -> hardTrack
-                Rating.GOOD -> goodTrack
-                Rating.EASY -> easyTrack
+                Rating.AGAIN -> againSamples
+                Rating.HARD -> hardSamples
+                Rating.GOOD -> goodSamples
+                Rating.EASY -> easySamples
                 Rating.UNRECOGNIZED -> return
             }
-        playTrack(track)
+        playSamples(samples)
     }
 
     fun release() {
-        for (track in allTracks) {
-            runCatching { track.release() }
-        }
-        allTracks.clear()
-    }
-
-    private val allTracks = mutableListOf<AudioTrack>()
-
-    private fun playTrack(track: AudioTrack?) {
-        if (track == null) return
+        isReleased = true
         try {
-            if (track.playState != AudioTrack.PLAYSTATE_STOPPED) {
-                track.stop()
+            executor.execute {
+                releaseActiveTrack()
             }
-            track.reloadStaticData()
-            track.play()
-        } catch (e: IllegalStateException) {
-            Timber.w(e, "Failed to play reviewer feedback sound")
+        } catch (_: RejectedExecutionException) {
+            // Executor already shut down
+        }
+        executor.shutdown()
+    }
+
+    private fun playSamples(samples: ShortArray) {
+        if (isRobolectric || isReleased) return
+        try {
+            executor.execute {
+                if (isReleased) return@execute
+                playOnAudioThread(samples)
+            }
+        } catch (e: RejectedExecutionException) {
+            Timber.w(e, "Sound feedback executor rejected playback")
         }
     }
 
-    private fun createToneTrack(vararg segments: ToneSegment): AudioTrack? {
-        if (isRobolectric) return null
-        val samples = synthesizeSegments(segments)
-        val bufferSizeBytes = samples.size * Short.SIZE_BYTES
+    private fun playOnAudioThread(samples: ShortArray) {
+        releaseActiveTrack()
+        val paddedSamples = padToMinBuffer(samples, minBufferBytes)
+        val bufferSizeBytes = paddedSamples.size * Short.SIZE_BYTES
         val format =
             AudioFormat
                 .Builder()
@@ -101,31 +137,44 @@ class ReviewerSoundFeedback {
                 .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                 .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                 .build()
-        return try {
-            AudioTrack
-                .Builder()
-                .setAudioAttributes(feedbackAudioAttributes)
-                .setAudioFormat(format)
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .setBufferSizeInBytes(bufferSizeBytes)
-                .build()
-                .apply {
-                    if (state != AudioTrack.STATE_INITIALIZED) {
-                        release()
-                        return null
-                    }
-                    val written = write(samples, 0, samples.size)
-                    if (written <= 0) {
-                        Timber.w("Failed to write samples to AudioTrack: %d", written)
-                        release()
-                        return null
-                    }
-                    allTracks.add(this)
-                }
+        try {
+            val track =
+                AudioTrack
+                    .Builder()
+                    .setAudioAttributes(feedbackAudioAttributes)
+                    .setAudioFormat(format)
+                    .setTransferMode(AudioTrack.MODE_STATIC)
+                    .setBufferSizeInBytes(bufferSizeBytes)
+                    .build()
+            // MODE_STATIC starts in STATE_NO_STATIC_DATA and transitions to STATE_INITIALIZED after write().
+            if (track.state == AudioTrack.STATE_UNINITIALIZED) {
+                Timber.w("Reviewer feedback AudioTrack uninitialized")
+                track.release()
+                return
+            }
+            val written = track.write(paddedSamples, 0, paddedSamples.size)
+            if (written <= 0 || track.state != AudioTrack.STATE_INITIALIZED) {
+                Timber.w("Failed to load static samples into AudioTrack (written=%d, state=%d)", written, track.state)
+                track.release()
+                return
+            }
+            track.play()
+            activeTrack = track
         } catch (e: RuntimeException) {
-            Timber.w(e, "Failed to initialize reviewer feedback AudioTrack")
-            null
+            Timber.w(e, "Failed to play reviewer feedback sound")
         }
+    }
+
+    private fun releaseActiveTrack() {
+        activeTrack?.let { previous ->
+            runCatching {
+                if (previous.playState != AudioTrack.PLAYSTATE_STOPPED) {
+                    previous.stop()
+                }
+            }
+            runCatching { previous.release() }
+        }
+        activeTrack = null
     }
 
     private data class ToneSegment(
@@ -135,7 +184,7 @@ class ReviewerSoundFeedback {
 
     companion object {
         private const val SAMPLE_RATE = 44100
-        private const val AMPLITUDE = 0.55
+        private const val AMPLITUDE = 0.60
         private const val FADE_MS = 8
 
         internal val feedbackAudioAttributes: AudioAttributes =
@@ -144,6 +193,16 @@ class ReviewerSoundFeedback {
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build()
+
+        internal fun padToMinBuffer(
+            samples: ShortArray,
+            minBufferSizeBytes: Int,
+        ): ShortArray {
+            if (minBufferSizeBytes <= 0) return samples
+            val minSamples = (minBufferSizeBytes + Short.SIZE_BYTES - 1) / Short.SIZE_BYTES
+            val targetSize = max(samples.size, minSamples)
+            return if (targetSize == samples.size) samples else samples.copyOf(targetSize)
+        }
 
         internal fun synthesizeToneSamples(
             frequencyHz: Double,

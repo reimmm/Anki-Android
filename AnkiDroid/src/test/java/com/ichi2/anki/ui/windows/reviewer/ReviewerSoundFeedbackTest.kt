@@ -30,6 +30,21 @@ class ReviewerSoundFeedbackTest {
     }
 
     @Test
+    fun `padToMinBuffer pads short arrays with silence without altering larger buffers`() {
+        val shortSamples = shortArrayOf(100, -100, 200)
+        val padded = ReviewerSoundFeedback.padToMinBuffer(shortSamples, minBufferSizeBytes = 10)
+        assertEquals(5, padded.size)
+        assertEquals(100, padded[0].toInt())
+        assertEquals(-100, padded[1].toInt())
+        assertEquals(200, padded[2].toInt())
+        assertEquals(0, padded[3].toInt())
+        assertEquals(0, padded[4].toInt())
+
+        val unpadded = ReviewerSoundFeedback.padToMinBuffer(shortSamples, minBufferSizeBytes = 4)
+        assertEquals(3, unpadded.size)
+    }
+
+    @Test
     fun `playback and release are safe under robolectric`() {
         val feedback = ReviewerSoundFeedback()
         feedback.playAutoAdvanceToggled(true)
@@ -40,5 +55,6 @@ class ReviewerSoundFeedbackTest {
         feedback.playAnswerFeedback(Rating.EASY)
         feedback.playAnswerFeedback(Rating.UNRECOGNIZED)
         feedback.release()
+        feedback.playAnswerFeedback(Rating.GOOD)
     }
 }
