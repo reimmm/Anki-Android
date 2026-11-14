@@ -59,6 +59,13 @@
             />
 
         <SwitchPreferenceCompat
+            android:key="@string/sound_feedback_mute_good_key"
+            android:title="@string/sound_feedback_mute_good"
+            android:summary="@string/sound_feedback_mute_good_summ"
+            android:defaultValue="false"
+            />
+
+        <SwitchPreferenceCompat
             android:key="@string/show_progress_preference"
             tools:title="Show remaining card count"
             android:defaultValue="true"

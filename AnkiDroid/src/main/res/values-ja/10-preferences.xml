@@ -368,6 +368,8 @@
     <string name="new_study_screen" maxLength="41">新しい学習画面</string>
     <string name="new_study_screen_summ"><![CDATA[現行の学習画面の後継となる、改良された学習画面。現行画面のいくつかの機能は変更または削除されました。ぜひ<a href="%1$s">ご意見・ご感想</a>をお寄せください。<a href="%2$s">不具合</a>がある場合もお知らせいただければ幸いです。]]></string>
     <string name="show_answer_feedback" maxLength="41">回答選択時にフィードバック（目印）を表示</string>
+    <string name="sound_feedback_mute_good" maxLength="41">Good の効果音を鳴らさない</string>
+    <string name="sound_feedback_mute_good_summ">Again・Hard・Easy・自動進行の切り替え時のみ効果音を再生します</string>
     <string name="screen" maxLength="41">画面枠</string>
     <string name="only_answer" maxLength="41" comment="Configuration of the \'Answer\' commands to only answer the card">回答のみ</string>
     <string name="flip_and_answer" maxLength="41" comment="Configuration of the \'Answer\' commands to answer the card if on the answer side, and flip it if on the question side">表面では解答を表示</string>

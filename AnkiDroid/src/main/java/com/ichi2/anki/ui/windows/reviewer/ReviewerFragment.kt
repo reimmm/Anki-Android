@@ -266,7 +266,7 @@ class ReviewerFragment :
 
         binding.webViewContainer.setFrameStyle()
 
-        soundFeedback = ReviewerSoundFeedback()
+        soundFeedback = ReviewerSoundFeedback(requireContext())
         viewModel.autoAdvanceFeedbackFlow.collectIn(lifecycleScope) { isEnabled ->
             soundFeedback?.playAutoAdvanceToggled(isEnabled)
         }
