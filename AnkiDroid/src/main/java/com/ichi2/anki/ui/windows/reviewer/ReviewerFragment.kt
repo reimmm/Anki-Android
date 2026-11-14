@@ -112,6 +112,7 @@ class ReviewerFragment :
     private lateinit var bindingMap: BindingMap<ReviewerBinding, ViewerAction>
     private lateinit var reviewerWebViewClient: ReviewerWebViewClient
     private var shakeDetector: AnkiShakeDetector? = null
+    private var soundFeedback: ReviewerSoundFeedback? = null
     private val whiteboardFragment get() = childFragmentManager.findFragmentByTag(WhiteboardFragment::class.jvmName) as? WhiteboardFragment
     private val isBigScreen: Boolean get() = resources.configuration.smallestScreenWidthDp >= 720
 
@@ -145,6 +146,12 @@ class ReviewerFragment :
             viewModel.stopAutoAdvance()
         }
         shakeDetector?.stop()
+    }
+
+    override fun onDestroyView() {
+        soundFeedback?.release()
+        soundFeedback = null
+        super.onDestroyView()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -225,6 +232,14 @@ class ReviewerFragment :
         }
 
         binding.webViewContainer.setFrameStyle()
+
+        soundFeedback = ReviewerSoundFeedback()
+        viewModel.autoAdvanceFeedbackFlow.collectIn(lifecycleScope) { isEnabled ->
+            soundFeedback?.playAutoAdvanceToggled(isEnabled)
+        }
+        viewModel.answerFeedbackFlow.collectIn(lifecycleScope) { ease ->
+            soundFeedback?.playAnswerFeedback(ease)
+        }
 
         if (Prefs.showAnswerFeedback) {
             viewModel.answerFeedbackFlow.collectIn(lifecycleScope) { ease ->

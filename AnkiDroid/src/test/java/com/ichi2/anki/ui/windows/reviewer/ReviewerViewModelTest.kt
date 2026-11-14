@@ -177,4 +177,19 @@ class ReviewerViewModelTest : RobolectricTest() {
             runCurrent()
             assertTrue(viewModel.showingAnswer.value)
         }
+
+    @Test
+    fun `toggling auto advance emits feedback event`() =
+        runTest {
+            addBasicNote()
+            val viewModel = ReviewerViewModel(SavedStateHandle()).also { viewModelStore.put("reviewer", it) }
+
+            viewModel.autoAdvanceFeedbackFlow.test {
+                viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
+                assertTrue(awaitItem())
+
+                viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
+                assertFalse(awaitItem())
+            }
+        }
 }
