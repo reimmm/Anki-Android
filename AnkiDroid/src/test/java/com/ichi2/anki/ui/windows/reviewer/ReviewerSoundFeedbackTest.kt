@@ -45,6 +45,27 @@ class ReviewerSoundFeedbackTest {
     }
 
     @Test
+    fun `all rating and auto-advance presets synthesize cleanly without clicks or clipping`() {
+        val presets =
+            listOf(
+                ReviewerSoundFeedback.AGAIN_NOTES,
+                ReviewerSoundFeedback.HARD_NOTES,
+                ReviewerSoundFeedback.GOOD_NOTES,
+                ReviewerSoundFeedback.EASY_NOTES,
+                ReviewerSoundFeedback.AUTO_ADVANCE_ON_NOTES,
+                ReviewerSoundFeedback.AUTO_ADVANCE_OFF_NOTES,
+            )
+        for (notes in presets) {
+            val samples = ReviewerSoundFeedback.synthesizeNotes(notes)
+            assertTrue(samples.isNotEmpty())
+            assertEquals(0, samples.first().toInt())
+            assertTrue(abs(samples.last().toInt()) < 50)
+            val peak = samples.maxOf { abs(it.toInt()) }
+            assertTrue(peak in 8000..30000, "Unexpected peak amplitude $peak")
+        }
+    }
+
+    @Test
     fun `playback and release are safe under robolectric`() {
         val feedback = ReviewerSoundFeedback()
         feedback.playAutoAdvanceToggled(true)
