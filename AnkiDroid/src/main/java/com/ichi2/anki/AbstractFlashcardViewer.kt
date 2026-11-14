@@ -215,6 +215,7 @@ abstract class AbstractFlashcardViewer :
 
     // Android WebView
     var automaticAnswer = AutomaticAnswer.defaultInstance(this)
+    private var mediaCompletionGeneration = 0
 
     @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
     internal var typeAnswer: TypeAnswer? = null
@@ -787,6 +788,8 @@ abstract class AbstractFlashcardViewer :
 
     open fun undo(): Job =
         launchCatchingTask {
+            automaticAnswer.onDisplayQuestion()
+            stopCardMediaPlayer()
             undoAndShowSnackbar(duration = Reviewer.ACTION_SNACKBAR_TIME)
         }
 
@@ -1330,9 +1333,10 @@ abstract class AbstractFlashcardViewer :
     }
 
     private suspend fun automaticAnswerShouldWaitForMedia(): Boolean =
-        withCol {
-            decks.configDictForDeckId(currentCard!!.did).waitForAudio
-        }
+        cardMediaPlayer.config?.autoplay == true &&
+            withCol {
+                decks.configDictForDeckId(currentCard!!.did).waitForAudio
+            }
 
     internal inner class ReadTextListener : ReadText.ReadTextListener {
         override fun onDone(playedSide: CardSide?) {
@@ -1469,6 +1473,7 @@ abstract class AbstractFlashcardViewer :
         runBlocking {
             cardMediaPlayer.loadCardAvTags(currentCard!!)
         }
+        mediaCompletionGeneration++
         cardContent = content.html
         fillFlashcard()
         playMedia(false) // Play media if appropriate
@@ -1528,7 +1533,9 @@ abstract class AbstractFlashcardViewer :
      */
     open fun onMediaGroupCompleted() {
         Timber.v("onMediaGroupCompleted")
+        val generation = mediaCompletionGeneration
         launchCatchingTask {
+            if (generation != mediaCompletionGeneration) return@launchCatchingTask
             if (automaticAnswerShouldWaitForMedia()) {
                 if (isDisplayingAnswer) {
                     automaticAnswer.scheduleAutomaticDisplayQuestion()
@@ -1598,12 +1605,12 @@ abstract class AbstractFlashcardViewer :
 
     fun buryCard(): Boolean {
         launchCatchingTask {
+            stopCardMediaPlayer()
             withProgress {
                 undoableOp {
                     sched.buryCards(listOf(currentCard!!.id))
                 }
             }
-            stopCardMediaPlayer()
             showSnackbar(CommonString.card_buried, Reviewer.ACTION_SNACKBAR_TIME)
         }
         return true
@@ -1612,12 +1619,12 @@ abstract class AbstractFlashcardViewer :
     @VisibleForTesting
     open fun suspendCard(): Boolean {
         launchCatchingTask {
+            stopCardMediaPlayer()
             withProgress {
                 undoableOp {
                     sched.suspendCards(listOf(currentCard!!.id))
                 }
             }
-            stopCardMediaPlayer()
             showSnackbar(TR.studyingCardSuspended(), Reviewer.ACTION_SNACKBAR_TIME)
         }
         return true
@@ -1626,6 +1633,7 @@ abstract class AbstractFlashcardViewer :
     @VisibleForTesting
     open fun suspendNote(): Boolean {
         launchCatchingTask {
+            stopCardMediaPlayer()
             val changed =
                 withProgress {
                     undoableOp {
@@ -1634,7 +1642,6 @@ abstract class AbstractFlashcardViewer :
                 }
             val count = changed.count
             val noteSuspended = resources.getQuantityString(CommonPlurals.note_suspended, count, count)
-            stopCardMediaPlayer()
             showSnackbar(noteSuspended, Reviewer.ACTION_SNACKBAR_TIME)
         }
         return true
@@ -1643,19 +1650,19 @@ abstract class AbstractFlashcardViewer :
     @VisibleForTesting
     open fun buryNote(): Boolean {
         launchCatchingTask {
+            stopCardMediaPlayer()
             val changed =
                 withProgress {
                     undoableOp {
                         sched.buryNotes(listOf(currentCard!!.nid))
                     }
                 }
-            stopCardMediaPlayer()
             showSnackbar(TR.studyingCardsBuried(changed.count), Reviewer.ACTION_SNACKBAR_TIME)
         }
         return true
     }
 
-    private suspend fun stopCardMediaPlayer() {
+    protected suspend fun stopCardMediaPlayer() {
         cardMediaPlayer.stop()
         ReadText.stopTts()
     }
