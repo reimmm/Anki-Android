@@ -48,14 +48,6 @@ class AutoAdvance(
             AutoAdvanceSettings.createInstance(initialCard.await().currentDeckId())
         }
 
-    private suspend fun durationToShowQuestionFor() = settings.await().durationToShowQuestionFor
-
-    private suspend fun durationToShowAnswerFor() = settings.await().durationToShowAnswerFor
-
-    private suspend fun questionAction() = settings.await().questionAction
-
-    private suspend fun answerAction() = settings.await().answerAction
-
     suspend fun shouldWaitForAudio() = settings.await().waitForAudio
 
     fun cancelQuestionAndAnswerActionJobs() {
@@ -72,24 +64,30 @@ class AutoAdvance(
     }
 
     suspend fun onShowQuestion() {
-        answerActionJob?.cancel()
-        if (!durationToShowQuestionFor().isPositive() || !isEnabled) return
+        cancelQuestionAndAnswerActionJobs()
+        val currentSettings = settings
+        val loadedSettings = currentSettings.await()
+        if (settings !== currentSettings) return
+        if (!loadedSettings.durationToShowQuestionFor.isPositive() || !isEnabled) return
 
         questionActionJob =
             scope.launch {
-                delay(durationToShowQuestionFor())
-                listener.onAutoAdvanceAction(questionAction())
+                delay(loadedSettings.durationToShowQuestionFor)
+                listener.onAutoAdvanceAction(loadedSettings.questionAction)
             }
     }
 
     suspend fun onShowAnswer() {
-        questionActionJob?.cancel()
-        if (!durationToShowAnswerFor().isPositive() || !isEnabled) return
+        cancelQuestionAndAnswerActionJobs()
+        val currentSettings = settings
+        val loadedSettings = currentSettings.await()
+        if (settings !== currentSettings) return
+        if (!loadedSettings.durationToShowAnswerFor.isPositive() || !isEnabled) return
 
         answerActionJob =
             scope.launch {
-                delay(durationToShowAnswerFor())
-                listener.onAutoAdvanceAction(answerAction())
+                delay(loadedSettings.durationToShowAnswerFor)
+                listener.onAutoAdvanceAction(loadedSettings.answerAction)
             }
     }
 }
