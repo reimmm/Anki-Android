@@ -2,8 +2,10 @@
 
 package com.ichi2.anki.ui.windows.reviewer
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
@@ -41,6 +43,7 @@ import anki.scheduler.CardAnswer.Rating
 import com.ichi2.anki.CollectionManager
 import com.ichi2.anki.DispatchKeyEventListener
 import com.ichi2.anki.Flag
+import com.ichi2.anki.IntentHandler
 import com.ichi2.anki.R
 import com.ichi2.anki.android.AnkiShakeDetector
 import com.ichi2.anki.cardviewer.Gesture
@@ -48,6 +51,8 @@ import com.ichi2.anki.common.annotations.NeedsTest
 import com.ichi2.anki.common.destinations.DeckOptionsDestination
 import com.ichi2.anki.common.destinations.navigate
 import com.ichi2.anki.common.utils.android.isRobolectric
+import com.ichi2.anki.common.utils.ext.unregisterReceiverSilently
+import com.ichi2.anki.compat.CompatHelper.Companion.registerReceiverCompat
 import com.ichi2.anki.databinding.FragmentReviewerBinding
 import com.ichi2.anki.dialogs.showDeckOptionsSelectionDialog
 import com.ichi2.anki.dialogs.tags.TagsDialogFactory
@@ -113,6 +118,18 @@ class ReviewerFragment :
     private lateinit var reviewerWebViewClient: ReviewerWebViewClient
     private var shakeDetector: AnkiShakeDetector? = null
     private var soundFeedback: ReviewerSoundFeedback? = null
+    private var isAutoAdvanceReceiverRegistered = false
+    private val autoAdvanceToggleReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context,
+                intent: Intent,
+            ) {
+                if (intent.action == IntentHandler.ACTION_TOGGLE_AUTO_ADVANCE) {
+                    viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
+                }
+            }
+        }
     private val whiteboardFragment get() = childFragmentManager.findFragmentByTag(WhiteboardFragment::class.jvmName) as? WhiteboardFragment
     private val isBigScreen: Boolean get() = resources.configuration.smallestScreenWidthDp >= 720
 
@@ -138,9 +155,25 @@ class ReviewerFragment :
     override fun onStart() {
         super.onStart()
         shakeDetector?.start()
+        if (!isAutoAdvanceReceiverRegistered) {
+            val filter =
+                IntentFilter(IntentHandler.ACTION_TOGGLE_AUTO_ADVANCE).apply {
+                    addCategory(Intent.CATEGORY_DEFAULT)
+                }
+            requireContext().registerReceiverCompat(
+                autoAdvanceToggleReceiver,
+                filter,
+                ContextCompat.RECEIVER_EXPORTED,
+            )
+            isAutoAdvanceReceiverRegistered = true
+        }
     }
 
     override fun onStop() {
+        if (isAutoAdvanceReceiverRegistered) {
+            requireContext().unregisterReceiverSilently(autoAdvanceToggleReceiver)
+            isAutoAdvanceReceiverRegistered = false
+        }
         super.onStop()
         if (!requireActivity().isChangingConfigurations) {
             viewModel.stopAutoAdvance()

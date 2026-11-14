@@ -2,9 +2,11 @@
 
 package com.ichi2.anki.ui.windows.reviewer
 
+import android.content.Intent
 import androidx.core.content.edit
 import androidx.fragment.app.DialogFragment
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.ichi2.anki.IntentHandler
 import com.ichi2.anki.RobolectricTest
 import com.ichi2.anki.cardviewer.Gesture
 import com.ichi2.anki.common.preferences.sharedPrefs
@@ -154,6 +156,34 @@ class ReviewerFragmentTest : RobolectricTest() {
                 val reopenedDialog = assertNotNull(currentDialog)
                 assertNotSame(dialog, reopenedDialog)
                 assertTrue(reopenedDialog.requireDialog().isShowing)
+            }
+        }
+
+    @Test
+    fun `broadcast intent toggles auto advance only while studying`() =
+        runTest {
+            addBasicNote()
+            withReviewer { controller ->
+                assertFalse(viewModel.isAutoAdvanceEnabledFlow.value)
+
+                targetContext.sendBroadcast(Intent(IntentHandler.ACTION_TOGGLE_AUTO_ADVANCE))
+                advanceRobolectricLooper()
+                advanceUntilIdle()
+                assertTrue(viewModel.isAutoAdvanceEnabledFlow.value)
+
+                targetContext.sendBroadcast(
+                    Intent(IntentHandler.ACTION_TOGGLE_AUTO_ADVANCE).addCategory(Intent.CATEGORY_DEFAULT),
+                )
+                advanceRobolectricLooper()
+                advanceUntilIdle()
+                assertFalse(viewModel.isAutoAdvanceEnabledFlow.value)
+
+                controller.stop()
+                advanceRobolectricLooper()
+                targetContext.sendBroadcast(Intent(IntentHandler.ACTION_TOGGLE_AUTO_ADVANCE))
+                advanceRobolectricLooper()
+                advanceUntilIdle()
+                assertFalse(viewModel.isAutoAdvanceEnabledFlow.value)
             }
         }
 

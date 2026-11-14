@@ -352,6 +352,7 @@ class IntentHandler : AbstractIntentHandler() {
     }
 
     companion object {
+        const val ACTION_TOGGLE_AUTO_ADVANCE = "com.ichi2.anki.TOGGLE_AUTO_ADVANCE"
         const val EXTRA_DECK_ID = "EXTRA_DECK_ID"
         private const val CLIPBOARD_INTENT = "com.ichi2.anki.COPY_DEBUG_INFO"
         private const val EXTRA_CLIPBOARD_DATA = "clip_data"

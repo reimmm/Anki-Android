@@ -8,8 +8,10 @@ import android.Manifest
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -87,6 +89,8 @@ import com.ichi2.anki.common.time.TimeManager
 import com.ichi2.anki.common.utils.android.HandlerUtils.executeFunctionWithDelay
 import com.ichi2.anki.common.utils.android.HandlerUtils.getDefaultLooper
 import com.ichi2.anki.common.utils.android.showThemedToast
+import com.ichi2.anki.common.utils.ext.unregisterReceiverSilently
+import com.ichi2.anki.compat.CompatHelper.Companion.registerReceiverCompat
 import com.ichi2.anki.libanki.Card
 import com.ichi2.anki.libanki.CardId
 import com.ichi2.anki.libanki.Collection
@@ -233,11 +237,48 @@ open class Reviewer :
     @VisibleForTesting
     protected open lateinit var processor: BindingMap<ReviewerBinding, ViewerCommand>
 
+    private var isAutoAdvanceReceiverRegistered = false
+    private val autoAdvanceToggleReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context,
+                intent: Intent,
+            ) {
+                if (intent.action == IntentHandler.ACTION_TOGGLE_AUTO_ADVANCE && colIsOpenUnsafe() && !isFinishing) {
+                    toggleAutoAdvance()
+                }
+            }
+        }
+
     private val addNoteLauncher =
         registerForActivityResult(
             ActivityResultContracts.StartActivityForResult(),
             FlashCardViewerResultCallback(),
         )
+
+    override fun onStart() {
+        super.onStart()
+        if (!isAutoAdvanceReceiverRegistered) {
+            val filter =
+                IntentFilter(IntentHandler.ACTION_TOGGLE_AUTO_ADVANCE).apply {
+                    addCategory(Intent.CATEGORY_DEFAULT)
+                }
+            registerReceiverCompat(
+                autoAdvanceToggleReceiver,
+                filter,
+                ContextCompat.RECEIVER_EXPORTED,
+            )
+            isAutoAdvanceReceiverRegistered = true
+        }
+    }
+
+    override fun onStop() {
+        if (isAutoAdvanceReceiverRegistered) {
+            unregisterReceiverSilently(autoAdvanceToggleReceiver)
+            isAutoAdvanceReceiverRegistered = false
+        }
+        super.onStop()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         if (showedActivityFailedScreen(savedInstanceState)) {
