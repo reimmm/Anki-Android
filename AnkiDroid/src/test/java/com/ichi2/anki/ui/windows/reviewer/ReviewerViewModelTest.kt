@@ -8,8 +8,17 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import anki.scheduler.CardAnswer.Rating
 import app.cash.turbine.test
 import com.ichi2.anki.RobolectricTest
+import com.ichi2.anki.cardviewer.CardMediaPlayer
+import com.ichi2.anki.cardviewer.SoundTagPlayer
+import com.ichi2.anki.libanki.SoundOrVideoTag
+import com.ichi2.anki.libanki.TtsPlayer
 import com.ichi2.anki.preferences.reviewer.ViewerAction
 import com.ichi2.anki.utils.ext.cardStateCustomizer
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.coVerifyOrder
+import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -191,5 +200,142 @@ class ReviewerViewModelTest : RobolectricTest() {
                 viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
                 assertFalse(awaitItem())
             }
+        }
+
+    @Test
+    fun `replaying media resets auto advance timer and waits for playback completion`() =
+        runTest {
+            addBasicNote("[sound:front.mp3]", "[sound:back.mp3]")
+            updateDeckConfig(col.decks.selected()) {
+                secondsToShowQuestion = 5.0
+                secondsToShowAnswer = 5.0
+            }
+
+            val playbackStarted = CompletableDeferred<Unit>()
+            val playbackGate = CompletableDeferred<Unit>()
+            val tagPlayer =
+                mockk<SoundTagPlayer> {
+                    coEvery { play(any(), any()) } coAnswers {
+                        playbackStarted.complete(Unit)
+                        playbackGate.await()
+                    }
+                    coEvery { release() } returns Unit
+                }
+            val viewModel = ReviewerViewModel(SavedStateHandle()).also { viewModelStore.put("reviewer", it) }
+            viewModel.setCardMediaPlayerForTesting(
+                CardMediaPlayer(
+                    soundTagPlayer = tagPlayer,
+                    ttsPlayer = CompletableDeferred(mockk<TtsPlayer>(relaxed = true)),
+                    mediaErrorListener = viewModel.mediaErrorHandler,
+                ),
+            )
+
+            viewModel.onPageFinished(false)
+            runCurrent()
+            viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
+            runCurrent()
+
+            advanceTimeBy(3.seconds)
+            runCurrent()
+            assertFalse(viewModel.showingAnswer.value)
+
+            viewModel.executeAction(ViewerAction.PLAY_MEDIA)
+            runCurrent()
+            playbackStarted.await()
+
+            advanceTimeBy(6.seconds)
+            runCurrent()
+            assertFalse(viewModel.showingAnswer.value)
+
+            playbackGate.complete(Unit)
+            viewModel.cardMediaPlayer.playAvTagsJob?.join()
+            runCurrent()
+
+            advanceTimeBy(4.seconds)
+            runCurrent()
+            assertFalse(viewModel.showingAnswer.value)
+
+            advanceTimeBy(1.seconds)
+            runCurrent()
+            assertTrue(viewModel.showingAnswer.value)
+        }
+
+    @Test
+    fun `play answer media plays only back audio and resets auto advance timer`() =
+        runTest {
+            val card1 = addBasicNote("[sound:front.mp3]", "[sound:back.mp3]").firstCard()
+            addBasicNote("front2", "back2")
+            updateDeckConfig(col.decks.selected()) {
+                replayq = true
+                secondsToShowQuestion = 10.0
+                secondsToShowAnswer = 5.0
+            }
+
+            val answerPlaybackStarted = CompletableDeferred<Unit>()
+            val answerPlaybackGate = CompletableDeferred<Unit>()
+            val tagPlayer =
+                mockk<SoundTagPlayer> {
+                    coEvery { play(SoundOrVideoTag("back.mp3"), any()) } coAnswers {
+                        answerPlaybackStarted.complete(Unit)
+                        answerPlaybackGate.await()
+                    }
+                    coEvery { play(SoundOrVideoTag("front.mp3"), any()) } returns Unit
+                    coEvery { release() } returns Unit
+                }
+            val viewModel = ReviewerViewModel(SavedStateHandle()).also { viewModelStore.put("reviewer", it) }
+            viewModel.setCardMediaPlayerForTesting(
+                CardMediaPlayer(
+                    soundTagPlayer = tagPlayer,
+                    ttsPlayer = CompletableDeferred(mockk<TtsPlayer>(relaxed = true)),
+                    mediaErrorListener = viewModel.mediaErrorHandler,
+                ),
+            )
+
+            viewModel.onPageFinished(false)
+            runCurrent()
+            viewModel.onShowAnswer()
+            runCurrent()
+            viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
+            runCurrent()
+
+            advanceTimeBy(3.seconds)
+            runCurrent()
+
+            viewModel.executeAction(ViewerAction.PLAY_ANSWER_MEDIA)
+            runCurrent()
+            answerPlaybackStarted.await()
+
+            advanceTimeBy(6.seconds)
+            runCurrent()
+            assertEquals(card1.id, viewModel.getCardId())
+
+            answerPlaybackGate.complete(Unit)
+            viewModel.cardMediaPlayer.playAvTagsJob?.join()
+            runCurrent()
+
+            coVerify(exactly = 0) { tagPlayer.play(SoundOrVideoTag("front.mp3"), any()) }
+            coVerify(exactly = 1) { tagPlayer.play(SoundOrVideoTag("back.mp3"), any()) }
+
+            advanceTimeBy(4.seconds)
+            runCurrent()
+            assertEquals(card1.id, viewModel.getCardId())
+
+            // Verify PLAY_MEDIA replays both front and back when replayQuestion = true and resets timer
+            viewModel.executeAction(ViewerAction.PLAY_MEDIA)
+            runCurrent()
+            viewModel.cardMediaPlayer.playAvTagsJob?.join()
+            runCurrent()
+            coVerifyOrder {
+                tagPlayer.play(SoundOrVideoTag("front.mp3"), any())
+                tagPlayer.play(SoundOrVideoTag("back.mp3"), any())
+            }
+
+            advanceTimeBy(4.seconds)
+            runCurrent()
+            assertEquals(card1.id, viewModel.getCardId())
+
+            advanceTimeBy(1.seconds)
+            runCurrent()
+            assertFalse(viewModel.getCardId() == card1.id)
         }
 }

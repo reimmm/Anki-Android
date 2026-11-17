@@ -187,6 +187,11 @@
             android:icon="@drawable/ic_play_circle_white"
             />
         <com.ichi2.preferences.ReviewerControlPreference
+            android:key="@string/play_answer_media_command_key"
+            android:title="@string/replay_answer_media"
+            android:icon="@drawable/ic_play_circle_white"
+            />
+        <com.ichi2.preferences.ReviewerControlPreference
             android:key="@string/record_voice_command_key"
             android:title="@string/record_voice"
             android:icon="@drawable/ic_action_mic"

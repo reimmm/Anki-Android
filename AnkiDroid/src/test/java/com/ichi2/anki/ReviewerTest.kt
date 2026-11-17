@@ -22,6 +22,8 @@ import com.ichi2.anki.CollectionManager.TR
 import com.ichi2.anki.cardviewer.Gesture
 import com.ichi2.anki.cardviewer.ViewerCommand.ANSWER_AGAIN
 import com.ichi2.anki.cardviewer.ViewerCommand.MARK
+import com.ichi2.anki.cardviewer.ViewerCommand.PLAY_ANSWER_MEDIA
+import com.ichi2.anki.cardviewer.ViewerCommand.PLAY_MEDIA
 import com.ichi2.anki.common.preferences.sharedPrefs
 import com.ichi2.anki.common.time.MockTime
 import com.ichi2.anki.common.time.TimeManager
@@ -41,6 +43,8 @@ import com.ichi2.anki.model.CardStateFilter
 import com.ichi2.anki.observability.undoableOp
 import com.ichi2.anki.preferences.PreferenceTestUtils
 import com.ichi2.anki.reviewer.ActionButtonStatus
+import com.ichi2.anki.reviewer.AutomaticAnswerAction
+import com.ichi2.anki.reviewer.AutomaticAnswerAction.Companion.answerAction
 import com.ichi2.anki.snackbar.showSnackbar
 import com.ichi2.testutils.common.Flaky
 import com.ichi2.testutils.common.OS
@@ -62,6 +66,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows
 import org.robolectric.shadows.ShadowLooper
 import timber.log.Timber
+import java.util.concurrent.TimeUnit
 import kotlin.test.junit5.JUnit5Asserter.assertNotNull
 
 @RunWith(AndroidJUnit4::class)
@@ -597,6 +602,64 @@ class ReviewerTest : RobolectricTest() {
             assertEquals(card1.id, reviewer.currentCard!!.id)
             assertFalse(reviewer.isDisplayingAnswer)
             assertTrue(reviewer.automaticAnswer.timeoutHandler.hasMessages(0))
+        }
+
+    @Test
+    fun `replay media resets automatic answer timer until media completes`() =
+        runTest {
+            updateDeckConfig(Consts.DEFAULT_DECK_ID) {
+                secondsToShowQuestion = 5.0
+                secondsToShowAnswer = 5.0
+                autoplay = false
+                answerAction = AutomaticAnswerAction.ANSWER_GOOD
+            }
+            val card1 = addBasicNote("front1", "back1").firstCard()
+            val card2 = addBasicNote("front2", "back2").firstCard()
+            val reviewer = startReviewer()
+            reviewer.automaticAnswer.reEnable(isDisplayingAnswer = false)
+            assertTrue(reviewer.automaticAnswer.timeoutHandler.hasMessages(0))
+
+            ShadowLooper.shadowMainLooper().idleFor(3, TimeUnit.SECONDS)
+            assertFalse(reviewer.isDisplayingAnswer)
+
+            reviewer.executeCommand(PLAY_MEDIA)
+            advanceUntilIdle()
+            reviewer.cardMediaPlayer.playAvTagsJob?.join()
+            for (i in 0..100) {
+                advanceUntilIdle()
+                ShadowLooper.shadowMainLooper().idle()
+                if (reviewer.automaticAnswer.timeoutHandler.hasMessages(0)) break
+                Thread.sleep(10)
+            }
+            assertTrue(reviewer.automaticAnswer.timeoutHandler.hasMessages(0))
+
+            ShadowLooper.shadowMainLooper().idleFor(3, TimeUnit.SECONDS)
+            assertFalse(reviewer.isDisplayingAnswer)
+
+            ShadowLooper.shadowMainLooper().idleFor(2, TimeUnit.SECONDS)
+            assertTrue(reviewer.isDisplayingAnswer)
+
+            ShadowLooper.shadowMainLooper().idleFor(3, TimeUnit.SECONDS)
+            assertEquals(card1.id, reviewer.currentCard!!.id)
+
+            reviewer.executeCommand(PLAY_ANSWER_MEDIA)
+            advanceUntilIdle()
+            reviewer.cardMediaPlayer.playAvTagsJob?.join()
+            for (i in 0..100) {
+                advanceUntilIdle()
+                ShadowLooper.shadowMainLooper().idle()
+                if (reviewer.automaticAnswer.timeoutHandler.hasMessages(0)) break
+                Thread.sleep(10)
+            }
+            assertTrue(reviewer.automaticAnswer.timeoutHandler.hasMessages(0))
+
+            ShadowLooper.shadowMainLooper().idleFor(3, TimeUnit.SECONDS)
+            assertEquals(card1.id, reviewer.currentCard!!.id)
+
+            ShadowLooper.shadowMainLooper().idleFor(2, TimeUnit.SECONDS)
+            advanceUntilIdle()
+            ShadowLooper.shadowMainLooper().idle()
+            assertEquals(card2.id, reviewer.currentCard!!.id)
         }
 
     companion object {

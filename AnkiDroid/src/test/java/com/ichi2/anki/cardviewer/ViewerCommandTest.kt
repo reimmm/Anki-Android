@@ -28,6 +28,7 @@ class ViewerCommandTest {
                 "binding_SUSPEND_CARD",
                 "binding_DELETE",
                 "binding_PLAY_MEDIA",
+                "binding_PLAY_ANSWER_MEDIA",
                 "binding_EXIT",
                 "binding_BURY_NOTE",
                 "binding_SUSPEND_NOTE",

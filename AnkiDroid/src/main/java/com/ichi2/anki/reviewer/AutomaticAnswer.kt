@@ -181,6 +181,14 @@ class AutomaticAnswer(
         stopShowAnswerTask()
     }
 
+    /** Stops pending automatic tasks and allows rescheduling once media replay finishes */
+    fun onReplayMedia() {
+        hasPlayedSounds = false
+
+        stopShowQuestionTask()
+        stopShowAnswerTask()
+    }
+
     // region TODO: These attempt to stop a race condition between a manual answer and the automated answer
     // I don't believe this is thread-safe
 

@@ -213,6 +213,7 @@ abstract class AbstractFlashcardViewer :
     // Android WebView
     var automaticAnswer = AutomaticAnswer.defaultInstance(this)
     private var mediaCompletionGeneration = 0
+    private var waitingForMediaReplayCompletion = false
 
     @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
     internal var typeAnswer: TypeAnswer? = null
@@ -1479,6 +1480,7 @@ abstract class AbstractFlashcardViewer :
 
     private fun updateCard(content: RenderedCard) {
         Timber.d("updateCard()")
+        waitingForMediaReplayCompletion = false
         // TODO: This doesn't need to be blocking
         runBlocking {
             cardMediaPlayer.loadCardAvTags(currentCard!!)
@@ -1507,16 +1509,26 @@ abstract class AbstractFlashcardViewer :
         val useTTS = tts.enabled && !cardMediaPlayer.hasMedia(displayAnswer)
         // We need to play the media from the proper side of the card
         if (!useTTS) {
-            launchCatchingTask {
+            if (doMediaReplay) {
                 val side = if (displayAnswer) SingleCardSide.BACK else SingleCardSide.FRONT
-                when (doMediaReplay) {
-                    true -> cardMediaPlayer.replayAll(side)
-                    false -> cardMediaPlayer.playAllForSide(side.toCardSide())
+                replayMediaWithAutomaticAnswerReset {
+                    cardMediaPlayer.replayAll(side)
+                }
+            } else {
+                launchCatchingTask {
+                    val side = if (displayAnswer) SingleCardSide.BACK else SingleCardSide.FRONT
+                    cardMediaPlayer.playAllForSide(side.toCardSide())
                 }
             }
             return
         }
 
+        if (doMediaReplay) {
+            automaticAnswer.onReplayMedia()
+            mediaCompletionGeneration++
+            waitingForMediaReplayCompletion = ttsInitialized
+            ReadText.stopTts()
+        }
         val replayQuestion = cardMediaPlayer.config?.replayQuestion == true
         // Text to speech is in effect here
         // If the question is displayed or if the question should be replayed, read the question
@@ -1529,6 +1541,45 @@ abstract class AbstractFlashcardViewer :
             }
         } else {
             replayOnTtsInit = true
+        }
+    }
+
+    protected open fun playAnswerMedia() {
+        if (!this.lifecycle.currentState.isAtLeast(RESUMED)) {
+            Timber.w("media is not played as the activity is inactive")
+            return
+        }
+        val useTTS = tts.enabled && !cardMediaPlayer.hasMedia(displayAnswer = true)
+        if (!useTTS) {
+            replayMediaWithAutomaticAnswerReset {
+                cardMediaPlayer.playAllForSide(CardSide.ANSWER)
+            }
+            return
+        }
+
+        automaticAnswer.onReplayMedia()
+        mediaCompletionGeneration++
+        waitingForMediaReplayCompletion = ttsInitialized
+        ReadText.stopTts()
+        if (ttsInitialized) {
+            readCardTts(SingleCardSide.BACK)
+        } else {
+            replayOnTtsInit = true
+        }
+    }
+
+    private fun replayMediaWithAutomaticAnswerReset(play: suspend () -> Unit) {
+        automaticAnswer.onReplayMedia()
+        waitingForMediaReplayCompletion = false
+        val beforeStopGeneration = ++mediaCompletionGeneration
+        launchCatchingTask {
+            cardMediaPlayer.stop()
+            if (mediaCompletionGeneration != beforeStopGeneration) return@launchCatchingTask
+            if (!this@AbstractFlashcardViewer.lifecycle.currentState.isAtLeast(RESUMED)) return@launchCatchingTask
+            if (!cardMediaPlayer.isEnabled) return@launchCatchingTask
+            mediaCompletionGeneration++
+            waitingForMediaReplayCompletion = true
+            play()
         }
     }
 
@@ -1546,7 +1597,9 @@ abstract class AbstractFlashcardViewer :
         val generation = mediaCompletionGeneration
         launchCatchingTask {
             if (generation != mediaCompletionGeneration) return@launchCatchingTask
-            if (automaticAnswerShouldWaitForMedia()) {
+            val wasWaitingForReplay = waitingForMediaReplayCompletion
+            waitingForMediaReplayCompletion = false
+            if (wasWaitingForReplay || automaticAnswerShouldWaitForMedia()) {
                 if (isDisplayingAnswer) {
                     automaticAnswer.scheduleAutomaticDisplayQuestion()
                 } else {
@@ -1741,6 +1794,11 @@ abstract class AbstractFlashcardViewer :
 
             ViewerCommand.PLAY_MEDIA -> {
                 playMedia(true)
+                true
+            }
+
+            ViewerCommand.PLAY_ANSWER_MEDIA -> {
+                playAnswerMedia()
                 true
             }
 

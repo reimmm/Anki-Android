@@ -28,6 +28,7 @@ enum class ViewerCommand : MappableAction<ReviewerBinding> {
     SUSPEND_CARD,
     DELETE,
     PLAY_MEDIA,
+    PLAY_ANSWER_MEDIA,
     EXIT,
     BURY_NOTE,
     SUSPEND_NOTE,
@@ -163,6 +164,7 @@ enum class ViewerCommand : MappableAction<ReviewerBinding> {
                 SHOW_ALL_HINTS -> listOf(keyCode(KeyEvent.KEYCODE_G, CardSide.BOTH))
                 ADD_NOTE -> listOf(keyCode(KeyEvent.KEYCODE_A, CardSide.BOTH))
                 SHOW_ANSWER,
+                PLAY_ANSWER_MEDIA,
                 DELETE,
                 EXIT,
                 UNSET_FLAG,

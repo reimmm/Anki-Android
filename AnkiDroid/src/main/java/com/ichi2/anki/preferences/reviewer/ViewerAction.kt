@@ -63,6 +63,7 @@ enum class ViewerAction(
     TOGGLE_AUTO_ADVANCE(R.id.action_toggle_auto_advance, R.drawable.ic_fast_forward_outlined, DISABLED),
     RECORD_VOICE(R.id.action_record_voice, R.drawable.ic_mic_outlined, DISABLED),
     PLAY_MEDIA(R.id.action_replay_media, R.drawable.ic_play_circle_white, DISABLED),
+    PLAY_ANSWER_MEDIA(R.id.action_replay_answer_media, R.drawable.ic_play_circle_white, DISABLED),
     USER_ACTION_1(R.id.user_action_1, R.drawable.user_action_1, DISABLED),
     USER_ACTION_2(R.id.user_action_2, R.drawable.user_action_2, DISABLED),
     USER_ACTION_3(R.id.user_action_3, R.drawable.user_action_3, DISABLED),
@@ -207,6 +208,7 @@ enum class ViewerAction(
                 )
             }
             // No default gestures
+            PLAY_ANSWER_MEDIA,
             DELETE,
             CARD_INFO,
             TAG,
@@ -267,6 +269,7 @@ enum class ViewerAction(
                 TOGGLE_AUTO_ADVANCE -> getString(R.string.toggle_auto_advance)
                 RECORD_VOICE -> getString(R.string.record_voice)
                 PLAY_MEDIA -> getString(R.string.replay_media)
+                PLAY_ANSWER_MEDIA -> getString(R.string.replay_answer_media)
                 USER_ACTION_1 -> getString(R.string.user_action_1)
                 USER_ACTION_2 -> getString(R.string.user_action_2)
                 USER_ACTION_3 -> getString(R.string.user_action_3)

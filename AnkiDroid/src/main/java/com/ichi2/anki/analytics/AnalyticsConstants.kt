@@ -76,6 +76,7 @@ object AnalyticsConstants {
             R.string.suspend_card_command_key,
             R.string.delete_command_key,
             R.string.play_media_command_key,
+            R.string.play_answer_media_command_key,
             R.string.abort_command_key,
             R.string.bury_note_command_key,
             R.string.suspend_note_command_key,
@@ -172,5 +173,6 @@ object AnalyticsConstants {
             // *********************************** Study Screen ************************************
             R.string.new_reviewer_options_key,
             R.string.show_answer_feedback_key,
+            R.string.sound_feedback_mute_good_key,
         )
 }

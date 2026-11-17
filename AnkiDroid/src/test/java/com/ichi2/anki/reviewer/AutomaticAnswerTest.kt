@@ -125,6 +125,24 @@ class AutomaticAnswerTest : JvmTest() {
         assertThat("answer should not be shown after onDisplayAnswer", answerValue.answerShown, equalTo(false))
     }
 
+    @Test
+    fun onReplayMediaStopsTasksAndAllowsRescheduling() {
+        val answerValue = AutoAnswerMock()
+        val answer = validAnswer(answerValue)
+        answer.scheduleAutomaticDisplayAnswer()
+        assertThat(answer.timeoutHandler.hasMessages(0), equalTo(true))
+
+        answer.onReplayMedia()
+        assertThat(answer.timeoutHandler.hasMessages(0), equalTo(false))
+        waitForTaskCompletion()
+        assertThat(answerValue.answerShown, equalTo(false))
+
+        answer.scheduleAutomaticDisplayAnswer()
+        assertThat(answer.timeoutHandler.hasMessages(0), equalTo(true))
+        waitForTaskCompletion()
+        assertThat(answerValue.answerShown, equalTo(true))
+    }
+
     private fun waitForTaskCompletion() {
         runUiThreadTasksIncludingDelayedTasks()
     }

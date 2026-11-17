@@ -2,6 +2,7 @@
 
 package com.ichi2.anki.ui.windows.reviewer
 
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import anki.collection.OpChanges
@@ -14,6 +15,7 @@ import com.ichi2.anki.CollectionManager.withCol
 import com.ichi2.anki.Flag
 import com.ichi2.anki.Reviewer
 import com.ichi2.anki.asyncIO
+import com.ichi2.anki.cardviewer.CardMediaPlayer
 import com.ichi2.anki.cardviewer.SingleCardSide
 import com.ichi2.anki.common.annotations.NeedsTest
 import com.ichi2.anki.common.destinations.BrowserDestination
@@ -67,6 +69,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import org.intellij.lang.annotations.Language
 import timber.log.Timber
+import java.util.concurrent.atomic.AtomicBoolean
 import com.ichi2.anki.common.destinations.Destination as NavigateDestination
 
 class ReviewerViewModel(
@@ -117,6 +120,7 @@ class ReviewerViewModel(
     private var typedAnswer = ""
 
     private val autoAdvance = AutoAdvance(viewModelScope, this, currentCard)
+    private val waitingForReplayCompletion = AtomicBoolean(false)
     private val isHtmlTypeAnswerEnabled = repository.isHtmlTypeAnswerEnabled
     val answerTimer = AnswerTimer()
     private val actionsMutex = Mutex()
@@ -149,8 +153,13 @@ class ReviewerViewModel(
             // button with the answer buttons.
             updateNextTimes()
         }
+        setupMediaGroupCompletedListener()
+    }
+
+    private fun setupMediaGroupCompletedListener() {
         cardMediaPlayer.setOnMediaGroupCompletedListener {
-            if (!autoAdvance.shouldWaitForAudio()) return@setOnMediaGroupCompletedListener
+            val wasWaitingForReplay = waitingForReplayCompletion.getAndSet(false)
+            if (!wasWaitingForReplay && !autoAdvance.shouldWaitForAudio()) return@setOnMediaGroupCompletedListener
 
             if (showingAnswer.value) {
                 autoAdvance.onShowAnswer()
@@ -158,6 +167,15 @@ class ReviewerViewModel(
                 autoAdvance.onShowQuestion()
             }
         }
+    }
+
+    @VisibleForTesting
+    internal fun setCardMediaPlayerForTesting(player: CardMediaPlayer) {
+        cardMediaPlayer.setOnMediaGroupCompletedListener(null)
+        cardMediaPlayer.close()
+        cardMediaPlayer = player
+        addCloseable(player)
+        setupMediaGroupCompletedListener()
     }
 
     override fun onPageFinished(isAfterRecreation: Boolean) {
@@ -210,6 +228,7 @@ class ReviewerViewModel(
      */
     private suspend fun showAnswerInternal() {
         Timber.v("ReviewerViewModel::onShowAnswer")
+        waitingForReplayCompletion.set(false)
         autoAdvance.cancelQuestionAndAnswerActionJobs()
         mutationSignal.await()
 
@@ -399,12 +418,14 @@ class ReviewerViewModel(
 
     private suspend fun undo() {
         Timber.v("ReviewerViewModel::undo")
+        waitingForReplayCompletion.set(false)
         autoAdvance.cancelQuestionAndAnswerActionJobs()
         actionFeedbackFlow.emit(tryUndo())
     }
 
     private suspend fun redo() {
         Timber.v("ReviewerViewModel::redo")
+        waitingForReplayCompletion.set(false)
         autoAdvance.cancelQuestionAndAnswerActionJobs()
         actionFeedbackFlow.emit(tryRedo())
     }
@@ -417,6 +438,7 @@ class ReviewerViewModel(
 
     fun stopAutoAdvance() {
         Timber.v("ReviewerViewModel::stopAutoAdvance")
+        waitingForReplayCompletion.set(false)
         autoAdvance.cancelQuestionAndAnswerActionJobs()
     }
 
@@ -433,7 +455,7 @@ class ReviewerViewModel(
             }
         actionFeedbackFlow.emit(message)
 
-        if (autoAdvance.shouldWaitForAudio() && cardMediaPlayer.isPlaying) return
+        if ((autoAdvance.shouldWaitForAudio() || waitingForReplayCompletion.get()) && cardMediaPlayer.isPlaying) return
 
         if (showingAnswer.value) {
             autoAdvance.onShowAnswer()
@@ -607,6 +629,7 @@ class ReviewerViewModel(
 
         val card = state.topCard
         currentCard = CompletableDeferred(card)
+        waitingForReplayCompletion.set(false)
         setupAnswerTimer(card)
         autoAdvance.onCardChange(card)
         onCardUpdatedFlow.emit(Unit) // must be before showQuestion()
@@ -702,7 +725,24 @@ class ReviewerViewModel(
 
     private suspend fun replayMedia() {
         val side = if (showingAnswer.value) SingleCardSide.BACK else SingleCardSide.FRONT
-        cardMediaPlayer.replayAll(side)
+        replayMediaForSide {
+            cardMediaPlayer.replayAll(side)
+        }
+    }
+
+    private suspend fun replayAnswerMedia() {
+        replayMediaForSide {
+            cardMediaPlayer.playAllForSide(CardSide.ANSWER)
+        }
+    }
+
+    private suspend fun replayMediaForSide(play: suspend () -> Unit) {
+        waitingForReplayCompletion.set(false)
+        cardMediaPlayer.stop()
+        autoAdvance.cancelQuestionAndAnswerActionJobs()
+        if (!cardMediaPlayer.isEnabled) return
+        waitingForReplayCompletion.set(true)
+        play()
     }
 
     private fun toggleWhiteboard() {
@@ -781,6 +821,7 @@ class ReviewerViewModel(
                     ViewerAction.STATISTICS -> navigateFlow.emit(StatisticsDestination)
                     ViewerAction.BROWSE -> emitBrowseDestination()
                     ViewerAction.PLAY_MEDIA -> replayMedia()
+                    ViewerAction.PLAY_ANSWER_MEDIA -> replayAnswerMedia()
                     ViewerAction.FLAG_MENU -> {}
                 }
             }

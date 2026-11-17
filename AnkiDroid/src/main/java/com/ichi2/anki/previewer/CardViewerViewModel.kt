@@ -43,7 +43,8 @@ abstract class CardViewerViewModel(
 
     val showingAnswer = savedStateHandle.getMutableStateFlow(KEY_SHOWING_ANSWER, false)
 
-    protected val cardMediaPlayer =
+    @VisibleForTesting
+    internal var cardMediaPlayer =
         CardMediaPlayer(
             javascriptEvaluator = { launchCatchingIO { eval.emit(it) } },
             mediaErrorListener = mediaErrorHandler,
