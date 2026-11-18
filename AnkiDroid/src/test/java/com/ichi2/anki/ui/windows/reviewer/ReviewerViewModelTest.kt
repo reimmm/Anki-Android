@@ -19,9 +19,13 @@ import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -337,5 +341,63 @@ class ReviewerViewModelTest : RobolectricTest() {
             advanceTimeBy(1.seconds)
             runCurrent()
             assertFalse(viewModel.getCardId() == card1.id)
+        }
+
+    @Test
+    fun `disabling auto advance stops active media playback`() =
+        runTest {
+            addBasicNote("[sound:front.mp3]", "[sound:back.mp3]")
+            updateDeckConfig(col.decks.selected()) {
+                autoplay = true
+                secondsToShowQuestion = 5.0
+            }
+
+            val playbackStarted = CompletableDeferred<Unit>()
+            val playbackGate = CompletableDeferred<Unit>()
+            val tagPlayer =
+                mockk<SoundTagPlayer> {
+                    coEvery { play(any(), any()) } coAnswers {
+                        playbackStarted.complete(Unit)
+                        playbackGate.await()
+                    }
+                    coEvery { release() } returns Unit
+                }
+            val viewModel = ReviewerViewModel(SavedStateHandle()).also { viewModelStore.put("reviewer", it) }
+            viewModel.setCardMediaPlayerForTesting(
+                CardMediaPlayer(
+                    soundTagPlayer = tagPlayer,
+                    ttsPlayer = CompletableDeferred(mockk<TtsPlayer>(relaxed = true)),
+                    mediaErrorListener = viewModel.mediaErrorHandler,
+                ),
+            )
+
+            viewModel.onPageFinished(false)
+            runCurrent()
+            playbackStarted.await()
+            assertTrue(viewModel.cardMediaPlayer.isPlaying)
+
+            viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
+            withContext(Dispatchers.Default) {
+                withTimeout(5.seconds) {
+                    viewModel.isAutoAdvanceEnabledFlow.first { it }
+                }
+            }
+            runCurrent()
+            assertTrue(viewModel.isAutoAdvanceEnabledFlow.value)
+            assertTrue(viewModel.cardMediaPlayer.isPlaying)
+
+            viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
+            withContext(Dispatchers.Default) {
+                withTimeout(5.seconds) {
+                    viewModel.isAutoAdvanceEnabledFlow.first { !it }
+                }
+            }
+            runCurrent()
+            assertFalse(viewModel.isAutoAdvanceEnabledFlow.value)
+            assertFalse(viewModel.cardMediaPlayer.isPlaying)
+
+            advanceTimeBy(10.seconds)
+            runCurrent()
+            assertFalse(viewModel.showingAnswer.value)
         }
 }

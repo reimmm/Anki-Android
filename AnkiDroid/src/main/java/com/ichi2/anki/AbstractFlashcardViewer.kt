@@ -1726,6 +1726,8 @@ abstract class AbstractFlashcardViewer :
     }
 
     protected suspend fun stopCardMediaPlayer() {
+        waitingForMediaReplayCompletion = false
+        mediaCompletionGeneration++
         cardMediaPlayer.stop()
         ReadText.stopTts()
     }

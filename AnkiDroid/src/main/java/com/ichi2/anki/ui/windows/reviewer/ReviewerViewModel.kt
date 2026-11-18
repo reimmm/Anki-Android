@@ -444,16 +444,23 @@ class ReviewerViewModel(
 
     private suspend fun toggleAutoAdvance() {
         Timber.v("ReviewerViewModel::toggleAutoAdvance")
-        autoAdvance.isEnabled = !autoAdvance.isEnabled
-        isAutoAdvanceEnabledFlow.value = autoAdvance.isEnabled
-        autoAdvanceFeedbackFlow.emit(autoAdvance.isEnabled)
+        val enabled = !autoAdvance.isEnabled
+        autoAdvance.isEnabled = enabled
+        if (!enabled) {
+            waitingForReplayCompletion.set(false)
+            cardMediaPlayer.stop()
+        }
+        isAutoAdvanceEnabledFlow.value = enabled
+        autoAdvanceFeedbackFlow.emit(enabled)
         val message =
-            if (autoAdvance.isEnabled) {
+            if (enabled) {
                 TR.actionsAutoAdvanceActivated()
             } else {
                 TR.actionsAutoAdvanceDeactivated()
             }
         actionFeedbackFlow.emit(message)
+
+        if (!enabled) return
 
         if ((autoAdvance.shouldWaitForAudio() || waitingForReplayCompletion.get()) && cardMediaPlayer.isPlaying) return
 

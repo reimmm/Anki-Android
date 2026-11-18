@@ -2099,6 +2099,9 @@ open class Reviewer :
         } else {
             Timber.i("Disabling auto advance")
             automaticAnswer.disable()
+            launchCatchingTask {
+                stopCardMediaPlayer()
+            }
             showSnackbar(TR.actionsAutoAdvanceDeactivated())
         }
     }

@@ -662,6 +662,34 @@ class ReviewerTest : RobolectricTest() {
             assertEquals(card2.id, reviewer.currentCard!!.id)
         }
 
+    @Test
+    fun `disabling auto advance stops active media playback`() =
+        runTest {
+            updateDeckConfig(Consts.DEFAULT_DECK_ID) {
+                secondsToShowQuestion = 5.0
+                autoplay = false
+            }
+            addBasicNote("front1", "back1")
+            val reviewer = startReviewer()
+            reviewer.automaticAnswer.reEnable(isDisplayingAnswer = false)
+            assertTrue(reviewer.automaticAnswer.isEnabled())
+
+            reviewer.executeCommand(PLAY_MEDIA)
+            advanceUntilIdle()
+
+            reviewer.executeCommand(com.ichi2.anki.cardviewer.ViewerCommand.TOGGLE_AUTO_ADVANCE)
+            for (i in 0..100) {
+                advanceUntilIdle()
+                ShadowLooper.shadowMainLooper().idle()
+                if (!reviewer.cardMediaPlayer.isPlaying) break
+                Thread.sleep(10)
+            }
+
+            assertFalse(reviewer.automaticAnswer.isEnabled())
+            assertFalse(reviewer.automaticAnswer.timeoutHandler.hasMessages(0))
+            assertFalse(reviewer.cardMediaPlayer.isPlaying)
+        }
+
     companion object {
         fun startReviewer(testClass: RobolectricTest): Reviewer = startReviewer(testClass, Reviewer::class.java)
 

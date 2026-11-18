@@ -111,7 +111,7 @@ class CardMediaPlayer : Closeable {
 
     @VisibleForTesting
     var playAvTagsJob: Job? = null
-    val isPlaying get() = playAvTagsJob != null
+    val isPlaying get() = playAvTagsJob?.isActive == true
 
     private var onMediaGroupCompleted: (suspend () -> Unit)? = null
 
@@ -218,6 +218,7 @@ class CardMediaPlayer : Closeable {
     suspend fun stop() {
         if (isPlaying) Timber.i("stopping playing all AV tags")
         playAvTagsJob?.cancelAndJoin()
+        playAvTagsJob = null
     }
 
     override fun close() {
