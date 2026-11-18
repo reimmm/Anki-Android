@@ -20,7 +20,6 @@ import io.mockk.coVerifyOrder
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -236,15 +235,8 @@ class ReviewerViewModelTest : RobolectricTest() {
             )
 
             viewModel.onPageFinished(false)
-            withContext(Dispatchers.Default) { delay(50) }
             runCurrent()
             viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
-            withContext(Dispatchers.Default) {
-                withTimeout(5.seconds) {
-                    viewModel.isAutoAdvanceEnabledFlow.first { it }
-                }
-                delay(50)
-            }
             runCurrent()
 
             advanceTimeBy(3.seconds)
@@ -252,27 +244,15 @@ class ReviewerViewModelTest : RobolectricTest() {
             assertFalse(viewModel.showingAnswer.value)
 
             viewModel.executeAction(ViewerAction.PLAY_MEDIA)
-            withContext(Dispatchers.Default) {
-                withTimeout(5.seconds) {
-                    playbackStarted.await()
-                }
-                delay(50)
-            }
             runCurrent()
+            playbackStarted.await()
 
             advanceTimeBy(6.seconds)
             runCurrent()
             assertFalse(viewModel.showingAnswer.value)
 
             playbackGate.complete(Unit)
-            withContext(Dispatchers.Default) {
-                withTimeout(5.seconds) {
-                    while (viewModel.cardMediaPlayer.isPlaying) {
-                        delay(10)
-                    }
-                }
-                delay(50)
-            }
+            viewModel.cardMediaPlayer.playAvTagsJob?.join()
             runCurrent()
 
             advanceTimeBy(4.seconds)
@@ -297,7 +277,6 @@ class ReviewerViewModelTest : RobolectricTest() {
 
             val answerPlaybackStarted = CompletableDeferred<Unit>()
             val answerPlaybackGate = CompletableDeferred<Unit>()
-            val frontReplayCompleted = CompletableDeferred<Unit>()
             val tagPlayer =
                 mockk<SoundTagPlayer> {
                     coEvery { play(SoundOrVideoTag("back.mp3"), any()) } coAnswers {
@@ -306,9 +285,7 @@ class ReviewerViewModelTest : RobolectricTest() {
                             answerPlaybackGate.await()
                         }
                     }
-                    coEvery { play(SoundOrVideoTag("front.mp3"), any()) } coAnswers {
-                        frontReplayCompleted.complete(Unit)
-                    }
+                    coEvery { play(SoundOrVideoTag("front.mp3"), any()) } returns Unit
                     coEvery { release() } returns Unit
                 }
             val viewModel = ReviewerViewModel(SavedStateHandle()).also { viewModelStore.put("reviewer", it) }
@@ -321,45 +298,25 @@ class ReviewerViewModelTest : RobolectricTest() {
             )
 
             viewModel.onPageFinished(false)
-            withContext(Dispatchers.Default) { delay(50) }
             runCurrent()
             viewModel.onShowAnswer()
-            withContext(Dispatchers.Default) { delay(50) }
             runCurrent()
             viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
-            withContext(Dispatchers.Default) {
-                withTimeout(5.seconds) {
-                    viewModel.isAutoAdvanceEnabledFlow.first { it }
-                }
-                delay(50)
-            }
             runCurrent()
 
             advanceTimeBy(3.seconds)
             runCurrent()
 
             viewModel.executeAction(ViewerAction.PLAY_ANSWER_MEDIA)
-            withContext(Dispatchers.Default) {
-                withTimeout(5.seconds) {
-                    answerPlaybackStarted.await()
-                }
-                delay(50)
-            }
             runCurrent()
+            answerPlaybackStarted.await()
 
             advanceTimeBy(6.seconds)
             runCurrent()
             assertEquals(card1.id, viewModel.getCardId())
 
             answerPlaybackGate.complete(Unit)
-            withContext(Dispatchers.Default) {
-                withTimeout(5.seconds) {
-                    while (viewModel.cardMediaPlayer.isPlaying) {
-                        delay(10)
-                    }
-                }
-                delay(50)
-            }
+            viewModel.cardMediaPlayer.playAvTagsJob?.join()
             runCurrent()
 
             coVerify(exactly = 0) { tagPlayer.play(SoundOrVideoTag("front.mp3"), any()) }
@@ -371,15 +328,8 @@ class ReviewerViewModelTest : RobolectricTest() {
 
             // Verify PLAY_MEDIA replays both front and back when replayQuestion = true and resets timer
             viewModel.executeAction(ViewerAction.PLAY_MEDIA)
-            withContext(Dispatchers.Default) {
-                withTimeout(5.seconds) {
-                    frontReplayCompleted.await()
-                    while (viewModel.cardMediaPlayer.isPlaying) {
-                        delay(10)
-                    }
-                }
-                delay(50)
-            }
+            runCurrent()
+            viewModel.cardMediaPlayer.playAvTagsJob?.join()
             runCurrent()
             coVerifyOrder {
                 tagPlayer.play(SoundOrVideoTag("front.mp3"), any())
