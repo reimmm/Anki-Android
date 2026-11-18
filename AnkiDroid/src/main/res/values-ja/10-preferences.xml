@@ -370,6 +370,8 @@
     <string name="show_answer_feedback" maxLength="41">回答選択時にフィードバック（目印）を表示</string>
     <string name="sound_feedback_mute_good" maxLength="41">Good の効果音を鳴らさない</string>
     <string name="sound_feedback_mute_good_summ">Again・Hard・Easy・自動進行の切り替え時のみ効果音を再生します</string>
+    <string name="duck_background_audio" maxLength="41">学習中は背景音楽の音量を下げ続ける</string>
+    <string name="duck_background_audio_summ">学習画面・プレビュー画面を開いている間、他アプリの音楽音量を常に下げた状態にします</string>
     <string name="screen" maxLength="41">画面枠</string>
     <string name="only_answer" maxLength="41" comment="Configuration of the \'Answer\' commands to only answer the card">回答のみ</string>
     <string name="flip_and_answer" maxLength="41" comment="Configuration of the \'Answer\' commands to answer the card if on the answer side, and flip it if on the question side">表面では解答を表示</string>

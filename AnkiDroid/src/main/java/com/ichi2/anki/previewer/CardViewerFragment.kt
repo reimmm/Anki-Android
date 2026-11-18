@@ -28,6 +28,7 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.ichi2.anki.R
 import com.ichi2.anki.ViewerResourceHandler
+import com.ichi2.anki.cardviewer.CardAudioFocusManager
 import com.ichi2.anki.compat.CompatHelper.Companion.resolveActivityCompat
 import com.ichi2.anki.dialogs.TtsVoicesDialogFragment
 import com.ichi2.anki.localizedErrorMessage
@@ -443,6 +444,16 @@ abstract class CardViewerFragment(
             activeRequest = null
             optInDialog?.dismiss()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        CardAudioFocusManager.startContinuousDucking()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        CardAudioFocusManager.stopContinuousDucking()
     }
 
     private fun showMediaErrorSnackbar(filename: String) {

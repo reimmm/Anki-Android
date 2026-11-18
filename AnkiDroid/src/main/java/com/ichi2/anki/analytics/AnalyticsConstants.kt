@@ -29,6 +29,7 @@ object AnalyticsConstants {
             R.string.learn_cutoff_preference, // Learn ahead limit
             R.string.time_limit_preference, // Timebox time limit
             R.string.keep_screen_on_preference, // Disable screen timeout
+            R.string.duck_background_audio_key, // Duck background music while studying
             R.string.double_tap_timeout_pref_key, // Double tap time interval (milliseconds)
             // ******************************** Sync ***************************************************
             R.string.sync_fetch_media_key, // Fetch media on sync

@@ -2,7 +2,6 @@
 
 package com.ichi2.anki.cardviewer
 
-import android.content.Context
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
@@ -12,11 +11,8 @@ import androidx.annotation.VisibleForTesting
 import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC
-import androidx.media3.common.audio.AudioFocusRequestCompat
-import androidx.media3.common.audio.AudioManagerCompat
 import androidx.media3.common.util.UnstableApi
 import com.ichi2.anki.CollectionManager.withCol
-import com.ichi2.anki.common.android.appContext
 import com.ichi2.anki.common.annotations.NeedsTest
 import com.ichi2.anki.ensureActive
 import com.ichi2.anki.libanki.SoundOrVideoTag
@@ -41,20 +37,6 @@ class SoundTagPlayer(
             .Builder()
             .setContentType(AUDIO_CONTENT_TYPE_MUSIC)
             .build()
-
-    /**
-     * AudioManager to request/release audio focus
-     */
-    private var audioManager: AudioManager =
-        appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
-    // the same instance of an AudioFocusRequestCompat must be used to cancel focus
-    private val audioFocusRequest: AudioFocusRequestCompat by lazy {
-        AudioFocusRequestCompat
-            .Builder(AudioManagerCompat.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-            .setOnAudioFocusChangeListener { }
-            .build()
-    }
 
     /**
      * @throws MediaException if the file does not exist, or if media playing fails
@@ -192,15 +174,9 @@ class SoundTagPlayer(
     }
 
     @CheckResult
-    private fun requestAudioFocus(): Int {
-        Timber.d("Requesting audio focus")
-        return AudioManagerCompat.requestAudioFocus(audioManager, audioFocusRequest)
-    }
+    private fun requestAudioFocus(): Int = CardAudioFocusManager.requestFocusForPlayback()
 
-    private fun abandonAudioFocus(): Int {
-        Timber.d("Abandoning audio focus")
-        return AudioManagerCompat.abandonAudioFocusRequest(audioManager, audioFocusRequest)
-    }
+    private fun abandonAudioFocus(): Int = CardAudioFocusManager.abandonFocusAfterPlayback()
 }
 
 suspend fun SoundOrVideoTag.getType(): SoundOrVideoTag.Type = getTagType(withCol { media.dir })

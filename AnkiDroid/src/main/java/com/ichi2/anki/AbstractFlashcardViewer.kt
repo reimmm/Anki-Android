@@ -78,6 +78,7 @@ import com.ichi2.anki.android.back.exitViaDoubleTapBackCallback
 import com.ichi2.anki.backend.stripHTMLAndSpecialFields
 import com.ichi2.anki.cardviewer.AndroidCardRenderContext
 import com.ichi2.anki.cardviewer.AndroidCardRenderContext.Companion.createInstance
+import com.ichi2.anki.cardviewer.CardAudioFocusManager
 import com.ichi2.anki.cardviewer.CardMediaPlayer
 import com.ichi2.anki.cardviewer.Gesture
 import com.ichi2.anki.cardviewer.GestureProcessor
@@ -611,6 +612,7 @@ abstract class AbstractFlashcardViewer :
     // Saves deck each time Reviewer activity loses focus
     override fun onPause() {
         super.onPause()
+        CardAudioFocusManager.stopContinuousDucking()
         gestureDetectorImpl.stopShakeDetector()
         if (this::cardMediaPlayer.isInitialized) {
             launchCatchingTask {
@@ -624,6 +626,7 @@ abstract class AbstractFlashcardViewer :
 
     override fun onResume() {
         super.onResume()
+        CardAudioFocusManager.startContinuousDucking()
         gestureDetectorImpl.startShakeDetector()
         if (this::cardMediaPlayer.isInitialized) {
             launchCatchingTask {

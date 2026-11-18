@@ -465,6 +465,8 @@ this formatter is used if the bind only applies to the answer">A: %s</string>
     <string name="show_answer_feedback" maxLength="41">Show answer feedback</string>
     <string name="sound_feedback_mute_good" maxLength="41">Mute Good answer sound</string>
     <string name="sound_feedback_mute_good_summ">Play sound feedback only for Again, Hard, Easy, and Auto Advance</string>
+    <string name="duck_background_audio" maxLength="41">Duck background music while studying</string>
+    <string name="duck_background_audio_summ">Keep background music volume lowered continuously while on the study or preview screen</string>
     <string name="screen" maxLength="41">Screen</string>
     <string name="only_answer" maxLength="41" comment="Configuration of the 'Answer' commands to only answer the card"
         >Only answer</string>

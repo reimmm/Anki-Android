@@ -54,5 +54,10 @@
             android:key="@string/keep_screen_on_preference"
             android:summary="@string/pref_keep_screen_on_summ"
             android:title="@string/pref_keep_screen_on" />
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="@string/duck_background_audio_key"
+            android:summary="@string/duck_background_audio_summ"
+            android:title="@string/duck_background_audio" />
     </PreferenceCategory>
 </PreferenceScreen>
