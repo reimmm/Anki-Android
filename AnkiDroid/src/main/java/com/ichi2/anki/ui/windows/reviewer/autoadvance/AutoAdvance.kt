@@ -50,6 +50,11 @@ class AutoAdvance(
 
     suspend fun shouldWaitForAudio() = settings.await().waitForAudio
 
+    @androidx.annotation.VisibleForTesting
+    internal suspend fun awaitSettingsForTesting() {
+        settings.await()
+    }
+
     fun cancelQuestionAndAnswerActionJobs() {
         questionActionJob?.cancel()
         answerActionJob?.cancel()

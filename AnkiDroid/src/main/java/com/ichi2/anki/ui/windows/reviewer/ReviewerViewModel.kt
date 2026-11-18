@@ -62,6 +62,7 @@ import com.ichi2.anki.utils.ext.getLongOrNull
 import com.ichi2.anki.utils.ext.setUserFlagForCards
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -124,6 +125,8 @@ class ReviewerViewModel(
     private val isHtmlTypeAnswerEnabled = repository.isHtmlTypeAnswerEnabled
     val answerTimer = AnswerTimer()
     private val actionsMutex = Mutex()
+    private var pageFinishedJob: Job? = null
+    private var lastActionJob: Job? = null
 
     /**
      * A flag that determines if the SchedulingStates in CurrentQueueState are
@@ -178,28 +181,44 @@ class ReviewerViewModel(
         setupMediaGroupCompletedListener()
     }
 
+    @VisibleForTesting
+    internal suspend fun awaitAutoAdvanceSettingsForTesting() {
+        autoAdvance.awaitSettingsForTesting()
+    }
+
+    @VisibleForTesting
+    internal suspend fun awaitPageFinishedForTesting() {
+        pageFinishedJob?.join()
+    }
+
+    @VisibleForTesting
+    internal suspend fun awaitActionsForTesting() {
+        lastActionJob?.join()
+    }
+
     override fun onPageFinished(isAfterRecreation: Boolean) {
         Timber.v("ReviewerViewModel::onPageFinished %b", isAfterRecreation)
-        if (isAfterRecreation) {
-            launchCatchingIO {
-                // TODO handle "Don't keep activities"
-                if (showingAnswer.value) {
-                    showAnswer()
-                    // on configuration change: mutationSignal & queueState are retained
-                    // on process death: a new queueState/mutationSignal exist. Call
-                    // `runStateMutationHook` to ensure mutationSignal completes.
-                    if (!mutationSignal.isCompleted) {
-                        runStateMutationHook()
+        pageFinishedJob =
+            if (isAfterRecreation) {
+                launchCatchingIO {
+                    // TODO handle "Don't keep activities"
+                    if (showingAnswer.value) {
+                        showAnswer()
+                        // on configuration change: mutationSignal & queueState are retained
+                        // on process death: a new queueState/mutationSignal exist. Call
+                        // `runStateMutationHook` to ensure mutationSignal completes.
+                        if (!mutationSignal.isCompleted) {
+                            runStateMutationHook()
+                        }
+                    } else {
+                        showQuestion()
                     }
-                } else {
-                    showQuestion()
+                }
+            } else {
+                launchCatchingIO {
+                    updateCurrentCard()
                 }
             }
-        } else {
-            launchCatchingIO {
-                updateCurrentCard()
-            }
-        }
     }
 
     fun onShowAnswer() {
@@ -766,73 +785,74 @@ class ReviewerViewModel(
 
     fun executeAction(action: ViewerAction) {
         Timber.v("ReviewerViewModel::executeAction %s", action.name)
-        launchCatchingIO {
-            actionsMutex.withLock {
-                when (action) {
-                    ViewerAction.ADD_NOTE -> emitAddNoteDestination()
-                    ViewerAction.CARD_INFO -> emitCardInfoDestination()
-                    ViewerAction.PREVIOUS_CARD_INFO -> emitPreviousCardInfoDestination()
-                    ViewerAction.DECK_OPTIONS -> emitDeckOptionsDestination()
-                    ViewerAction.EDIT -> emitEditNoteDestination()
-                    ViewerAction.TAG -> editNoteTags()
-                    ViewerAction.DELETE -> deleteNote()
-                    ViewerAction.MARK -> toggleMark()
-                    ViewerAction.REDO -> redo()
-                    ViewerAction.UNDO -> undo()
-                    ViewerAction.RESCHEDULE_NOTE -> launchSetDueDate()
-                    ViewerAction.RESET_PROGRESS -> launchResetProgress()
-                    ViewerAction.TOGGLE_AUTO_ADVANCE -> toggleAutoAdvance()
-                    ViewerAction.BURY_NOTE -> buryNote()
-                    ViewerAction.BURY_CARD -> buryCard()
-                    ViewerAction.SUSPEND_NOTE -> suspendNote()
-                    ViewerAction.SUSPEND_CARD -> suspendCard()
-                    ViewerAction.UNSET_FLAG -> setFlag(Flag.NONE)
-                    ViewerAction.FLAG_RED -> setFlag(Flag.RED)
-                    ViewerAction.FLAG_ORANGE -> setFlag(Flag.ORANGE)
-                    ViewerAction.FLAG_BLUE -> setFlag(Flag.BLUE)
-                    ViewerAction.FLAG_GREEN -> setFlag(Flag.GREEN)
-                    ViewerAction.FLAG_PINK -> setFlag(Flag.PINK)
-                    ViewerAction.FLAG_TURQUOISE -> setFlag(Flag.TURQUOISE)
-                    ViewerAction.FLAG_PURPLE -> setFlag(Flag.PURPLE)
-                    ViewerAction.TOGGLE_FLAG_RED -> toggleFlag(Flag.RED)
-                    ViewerAction.TOGGLE_FLAG_ORANGE -> toggleFlag(Flag.ORANGE)
-                    ViewerAction.TOGGLE_FLAG_BLUE -> toggleFlag(Flag.BLUE)
-                    ViewerAction.TOGGLE_FLAG_GREEN -> toggleFlag(Flag.GREEN)
-                    ViewerAction.TOGGLE_FLAG_PINK -> toggleFlag(Flag.PINK)
-                    ViewerAction.TOGGLE_FLAG_TURQUOISE -> toggleFlag(Flag.TURQUOISE)
-                    ViewerAction.TOGGLE_FLAG_PURPLE -> toggleFlag(Flag.PURPLE)
-                    ViewerAction.SHOW_ANSWER -> if (!showingAnswer.value) showAnswerInternal()
-                    ViewerAction.ANSWER_AGAIN -> answerCardInternal(Rating.AGAIN)
-                    ViewerAction.ANSWER_HARD -> answerCardInternal(Rating.HARD)
-                    ViewerAction.ANSWER_GOOD -> answerCardInternal(Rating.GOOD)
-                    ViewerAction.ANSWER_EASY -> answerCardInternal(Rating.EASY)
-                    ViewerAction.SHOW_HINT -> eval.emit("ankidroid.showHint()")
-                    ViewerAction.SHOW_ALL_HINTS -> eval.emit("ankidroid.showAllHints()")
-                    ViewerAction.TOGGLE_WHITEBOARD -> toggleWhiteboard()
-                    ViewerAction.RECORD_VOICE -> toggleRecordVoice()
-                    ViewerAction.REPLAY_VOICE -> replayVoiceFlow.emit(Unit)
-                    ViewerAction.PAGE_UP -> pageUpFlow.emit(Unit)
-                    ViewerAction.PAGE_DOWN -> pageDownFlow.emit(Unit)
-                    ViewerAction.EXIT -> finishResultFlow.emit(AbstractFlashcardViewer.RESULT_DEFAULT)
-                    ViewerAction.USER_ACTION_1 -> userAction(1)
-                    ViewerAction.USER_ACTION_2 -> userAction(2)
-                    ViewerAction.USER_ACTION_3 -> userAction(3)
-                    ViewerAction.USER_ACTION_4 -> userAction(4)
-                    ViewerAction.USER_ACTION_5 -> userAction(5)
-                    ViewerAction.USER_ACTION_6 -> userAction(6)
-                    ViewerAction.USER_ACTION_7 -> userAction(7)
-                    ViewerAction.USER_ACTION_8 -> userAction(8)
-                    ViewerAction.USER_ACTION_9 -> userAction(9)
-                    ViewerAction.SUSPEND_MENU -> suspendCard()
-                    ViewerAction.BURY_MENU -> buryCard()
-                    ViewerAction.STATISTICS -> navigateFlow.emit(StatisticsDestination)
-                    ViewerAction.BROWSE -> emitBrowseDestination()
-                    ViewerAction.PLAY_MEDIA -> replayMedia()
-                    ViewerAction.PLAY_ANSWER_MEDIA -> replayAnswerMedia()
-                    ViewerAction.FLAG_MENU -> {}
+        lastActionJob =
+            launchCatchingIO {
+                actionsMutex.withLock {
+                    when (action) {
+                        ViewerAction.ADD_NOTE -> emitAddNoteDestination()
+                        ViewerAction.CARD_INFO -> emitCardInfoDestination()
+                        ViewerAction.PREVIOUS_CARD_INFO -> emitPreviousCardInfoDestination()
+                        ViewerAction.DECK_OPTIONS -> emitDeckOptionsDestination()
+                        ViewerAction.EDIT -> emitEditNoteDestination()
+                        ViewerAction.TAG -> editNoteTags()
+                        ViewerAction.DELETE -> deleteNote()
+                        ViewerAction.MARK -> toggleMark()
+                        ViewerAction.REDO -> redo()
+                        ViewerAction.UNDO -> undo()
+                        ViewerAction.RESCHEDULE_NOTE -> launchSetDueDate()
+                        ViewerAction.RESET_PROGRESS -> launchResetProgress()
+                        ViewerAction.TOGGLE_AUTO_ADVANCE -> toggleAutoAdvance()
+                        ViewerAction.BURY_NOTE -> buryNote()
+                        ViewerAction.BURY_CARD -> buryCard()
+                        ViewerAction.SUSPEND_NOTE -> suspendNote()
+                        ViewerAction.SUSPEND_CARD -> suspendCard()
+                        ViewerAction.UNSET_FLAG -> setFlag(Flag.NONE)
+                        ViewerAction.FLAG_RED -> setFlag(Flag.RED)
+                        ViewerAction.FLAG_ORANGE -> setFlag(Flag.ORANGE)
+                        ViewerAction.FLAG_BLUE -> setFlag(Flag.BLUE)
+                        ViewerAction.FLAG_GREEN -> setFlag(Flag.GREEN)
+                        ViewerAction.FLAG_PINK -> setFlag(Flag.PINK)
+                        ViewerAction.FLAG_TURQUOISE -> setFlag(Flag.TURQUOISE)
+                        ViewerAction.FLAG_PURPLE -> setFlag(Flag.PURPLE)
+                        ViewerAction.TOGGLE_FLAG_RED -> toggleFlag(Flag.RED)
+                        ViewerAction.TOGGLE_FLAG_ORANGE -> toggleFlag(Flag.ORANGE)
+                        ViewerAction.TOGGLE_FLAG_BLUE -> toggleFlag(Flag.BLUE)
+                        ViewerAction.TOGGLE_FLAG_GREEN -> toggleFlag(Flag.GREEN)
+                        ViewerAction.TOGGLE_FLAG_PINK -> toggleFlag(Flag.PINK)
+                        ViewerAction.TOGGLE_FLAG_TURQUOISE -> toggleFlag(Flag.TURQUOISE)
+                        ViewerAction.TOGGLE_FLAG_PURPLE -> toggleFlag(Flag.PURPLE)
+                        ViewerAction.SHOW_ANSWER -> if (!showingAnswer.value) showAnswerInternal()
+                        ViewerAction.ANSWER_AGAIN -> answerCardInternal(Rating.AGAIN)
+                        ViewerAction.ANSWER_HARD -> answerCardInternal(Rating.HARD)
+                        ViewerAction.ANSWER_GOOD -> answerCardInternal(Rating.GOOD)
+                        ViewerAction.ANSWER_EASY -> answerCardInternal(Rating.EASY)
+                        ViewerAction.SHOW_HINT -> eval.emit("ankidroid.showHint()")
+                        ViewerAction.SHOW_ALL_HINTS -> eval.emit("ankidroid.showAllHints()")
+                        ViewerAction.TOGGLE_WHITEBOARD -> toggleWhiteboard()
+                        ViewerAction.RECORD_VOICE -> toggleRecordVoice()
+                        ViewerAction.REPLAY_VOICE -> replayVoiceFlow.emit(Unit)
+                        ViewerAction.PAGE_UP -> pageUpFlow.emit(Unit)
+                        ViewerAction.PAGE_DOWN -> pageDownFlow.emit(Unit)
+                        ViewerAction.EXIT -> finishResultFlow.emit(AbstractFlashcardViewer.RESULT_DEFAULT)
+                        ViewerAction.USER_ACTION_1 -> userAction(1)
+                        ViewerAction.USER_ACTION_2 -> userAction(2)
+                        ViewerAction.USER_ACTION_3 -> userAction(3)
+                        ViewerAction.USER_ACTION_4 -> userAction(4)
+                        ViewerAction.USER_ACTION_5 -> userAction(5)
+                        ViewerAction.USER_ACTION_6 -> userAction(6)
+                        ViewerAction.USER_ACTION_7 -> userAction(7)
+                        ViewerAction.USER_ACTION_8 -> userAction(8)
+                        ViewerAction.USER_ACTION_9 -> userAction(9)
+                        ViewerAction.SUSPEND_MENU -> suspendCard()
+                        ViewerAction.BURY_MENU -> buryCard()
+                        ViewerAction.STATISTICS -> navigateFlow.emit(StatisticsDestination)
+                        ViewerAction.BROWSE -> emitBrowseDestination()
+                        ViewerAction.PLAY_MEDIA -> replayMedia()
+                        ViewerAction.PLAY_ANSWER_MEDIA -> replayAnswerMedia()
+                        ViewerAction.FLAG_MENU -> {}
+                    }
                 }
             }
-        }
     }
 
     override fun processAction(

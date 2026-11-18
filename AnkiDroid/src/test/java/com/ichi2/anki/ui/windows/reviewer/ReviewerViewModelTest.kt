@@ -235,8 +235,10 @@ class ReviewerViewModelTest : RobolectricTest() {
             )
 
             viewModel.onPageFinished(false)
-            runCurrent()
+            viewModel.awaitPageFinishedForTesting()
+            viewModel.awaitAutoAdvanceSettingsForTesting()
             viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
+            viewModel.awaitActionsForTesting()
             runCurrent()
 
             advanceTimeBy(3.seconds)
@@ -244,6 +246,7 @@ class ReviewerViewModelTest : RobolectricTest() {
             assertFalse(viewModel.showingAnswer.value)
 
             viewModel.executeAction(ViewerAction.PLAY_MEDIA)
+            viewModel.awaitActionsForTesting()
             runCurrent()
             playbackStarted.await()
 
@@ -298,16 +301,20 @@ class ReviewerViewModelTest : RobolectricTest() {
             )
 
             viewModel.onPageFinished(false)
-            runCurrent()
+            viewModel.awaitPageFinishedForTesting()
+            viewModel.awaitAutoAdvanceSettingsForTesting()
             viewModel.onShowAnswer()
+            viewModel.awaitActionsForTesting()
             runCurrent()
             viewModel.executeAction(ViewerAction.TOGGLE_AUTO_ADVANCE)
+            viewModel.awaitActionsForTesting()
             runCurrent()
 
             advanceTimeBy(3.seconds)
             runCurrent()
 
             viewModel.executeAction(ViewerAction.PLAY_ANSWER_MEDIA)
+            viewModel.awaitActionsForTesting()
             runCurrent()
             answerPlaybackStarted.await()
 
@@ -328,6 +335,7 @@ class ReviewerViewModelTest : RobolectricTest() {
 
             // Verify PLAY_MEDIA replays both front and back when replayQuestion = true and resets timer
             viewModel.executeAction(ViewerAction.PLAY_MEDIA)
+            viewModel.awaitActionsForTesting()
             runCurrent()
             viewModel.cardMediaPlayer.playAvTagsJob?.join()
             runCurrent()
