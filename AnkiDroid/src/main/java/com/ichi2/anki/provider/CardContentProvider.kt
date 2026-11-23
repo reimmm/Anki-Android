@@ -108,6 +108,9 @@ class CardContentProvider : ContentProvider() {
         private const val MEDIA = 5000
         private const val CARDS = 6000
         private const val CARD_ID = 6001
+        const val AUTHORITY = "${BuildConfig.APPLICATION_ID}.flashcards"
+        private val AUTHORITY_URI: Uri = "content://$AUTHORITY".toUri()
+        const val READ_WRITE_PERMISSION = "${BuildConfig.APPLICATION_ID}.permission.READ_WRITE_DATABASE"
         private val sUriMatcher = UriMatcher(UriMatcher.NO_MATCH)
 
         /**
@@ -141,7 +144,7 @@ class CardContentProvider : ContentProvider() {
             fun addUri(
                 path: String,
                 code: Int,
-            ) = sUriMatcher.addURI(FlashCardsContract.AUTHORITY, path, code)
+            ) = sUriMatcher.addURI(AUTHORITY, path, code)
             // Here you can see all the URIs at a glance
             addUri("notes", NOTES)
             addUri("notes_v2", NOTES_V2)
@@ -924,7 +927,7 @@ class CardContentProvider : ContentProvider() {
                     // Add to collection
                     col.addNote(newNote, newNote.notetype.did)
 
-                    Uri.withAppendedPath(FlashCardsContract.Note.CONTENT_URI, newNote.id.toString())
+                    Uri.withAppendedPath(Uri.withAppendedPath(AUTHORITY_URI, "notes"), newNote.id.toString())
                 }
                 NOTES_ID -> throw IllegalArgumentException("Not possible to insert note with specific ID")
                 NOTES_ID_CARDS, NOTES_ID_CARDS_ORD -> throw IllegalArgumentException(
@@ -995,7 +998,7 @@ class CardContentProvider : ContentProvider() {
 
                         // Get the mid and return a URI
                         val noteTypeId = newNoteType.id.toString()
-                        Uri.withAppendedPath(FlashCardsContract.Model.CONTENT_URI, noteTypeId)
+                        Uri.withAppendedPath(Uri.withAppendedPath(AUTHORITY_URI, "models"), noteTypeId)
                     } catch (e: JSONException) {
                         Timber.e(e, "Could not set a field of new note type %s", noteTypeName)
                         null
@@ -1077,7 +1080,7 @@ class CardContentProvider : ContentProvider() {
                         deck.description = deckDesc
                         col.decks.save(deck)
                     }
-                    Uri.withAppendedPath(FlashCardsContract.Deck.CONTENT_ALL_URI, did.toString())
+                    Uri.withAppendedPath(Uri.withAppendedPath(AUTHORITY_URI, "decks"), did.toString())
                 }
                 DECK_SELECTED -> throw IllegalArgumentException("Selected deck can only be queried and updated")
                 DECKS_ID -> throw IllegalArgumentException("Not possible to insert deck with specific ID")
@@ -1463,15 +1466,14 @@ class CardContentProvider : ContentProvider() {
 
     private fun hasReadWritePermission(): Boolean =
         if (BuildConfig.DEBUG) { // Allow self-calling of the provider only in debug builds (e.g. for unit tests)
-            context!!.checkCallingOrSelfPermission(FlashCardsContract.READ_WRITE_PERMISSION) == PackageManager.PERMISSION_GRANTED
+            context!!.checkCallingOrSelfPermission(READ_WRITE_PERMISSION) == PackageManager.PERMISSION_GRANTED
         } else {
-            context!!.checkCallingPermission(FlashCardsContract.READ_WRITE_PERMISSION) == PackageManager.PERMISSION_GRANTED
+            context!!.checkCallingPermission(READ_WRITE_PERMISSION) == PackageManager.PERMISSION_GRANTED
         }
 
     /** Returns true if the calling package is known to be "rogue" and should be blocked.
      * Calling package might be rogue if it has not declared #READ_WRITE_PERMISSION in its manifest */
-    private fun knownRogueClient(): Boolean =
-        !context!!.arePermissionsDefinedInManifest(callingPackage!!, FlashCardsContract.READ_WRITE_PERMISSION)
+    private fun knownRogueClient(): Boolean = !context!!.arePermissionsDefinedInManifest(callingPackage!!, READ_WRITE_PERMISSION)
 }
 
 /** replaces [anki:play...] with [sound:] */
