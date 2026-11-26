@@ -87,6 +87,7 @@ import com.ichi2.anki.dialogs.ExportReadyDialog.Companion.REQUEST_EXPORT_SHARE
 import com.ichi2.anki.dialogs.SimpleMessageDialog
 import com.ichi2.anki.dialogs.handleExportReadyRequest
 import com.ichi2.anki.dialogs.viewmodel.ExportReadyViewModel
+import com.ichi2.anki.kiosk.KioskManager
 import com.ichi2.anki.libanki.Collection
 import com.ichi2.anki.receiver.SdCardReceiver
 import com.ichi2.anki.settings.Prefs
@@ -205,6 +206,7 @@ open class AnkiActivity(
 
     override fun onResume() {
         super.onResume()
+        KioskManager.enforceOnActivityResume(this)
         Analytics.sendAnalyticsScreenView(analyticsScreenName)
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(
             SIMPLE_NOTIFICATION_ID,
@@ -469,6 +471,10 @@ open class AnkiActivity(
      * @param url The URI to be opened.
      */
     open fun openUrl(url: Uri) {
+        if (KioskManager.shouldBlockExternalNavigation(this)) {
+            showSnackbar(getString(R.string.kiosk_external_blocked))
+            return
+        }
         if (!AdaptionUtil.hasWebBrowser(this)) {
             showSnackbar(getString(R.string.no_browser_msg, url.toString()))
             return
@@ -712,6 +718,10 @@ open class AnkiActivity(
         path: String,
         asText: Boolean = false,
     ) {
+        if (KioskManager.shouldBlockExternalNavigation(this)) {
+            showSnackbar(getString(R.string.kiosk_external_blocked))
+            return
+        }
         // Make sure the file actually exists
         val attachment = File(path)
         if (!attachment.exists()) {

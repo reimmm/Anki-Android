@@ -66,6 +66,42 @@
     <string name="hide_toolbar" maxLength="28">ツールバーを非表示</string>
     <string name="replay_media" maxLength="28">音声・動画を再生</string>
     <string name="replay_answer_media" maxLength="28">裏面のみ音声・動画を再生</string>
+    <string name="kiosk_mode" maxLength="28">Kiosk モード</string>
+    <string name="kiosk_status_locked">状態: Kiosk ロック中</string>
+    <string name="kiosk_status_break">状態: 自由時間中（残り %s）</string>
+    <string name="kiosk_status_unlocked">状態: 未ロック</string>
+    <string name="kiosk_device_owner_active">Device Owner: 有効</string>
+    <string name="kiosk_device_owner_inactive">Device Owner: 未設定（初回のみ PC から実行:\n%s）</string>
+    <string name="kiosk_qr_status_registered">QR キー: 登録済み</string>
+    <string name="kiosk_qr_status_unregistered">QR キー: 未登録</string>
+    <string name="kiosk_reward_rule_summary">ご褒美設定: %1$d問ごとに %2$d分 の自由時間</string>
+    <string name="kiosk_reward_progress_summary">次の自由時間まであと %1$d問（進捗 %2$d / %3$d問）</string>
+    <string name="kiosk_reward_banked_summary">保有している自由時間: %s</string>
+    <string name="kiosk_action_register_qr">QR コードを鍵として登録</string>
+    <string name="kiosk_action_change_qr">登録 QR コードを変更</string>
+    <string name="kiosk_action_lock_qr">QR で Kiosk ロック開始</string>
+    <string name="kiosk_action_unlock_qr">QR で Kiosk ロック解除</string>
+    <string name="kiosk_action_start_break">自由時間を使う（%s）</string>
+    <string name="kiosk_action_end_break_early">今すぐ学習に戻る（残り時間を温存）</string>
+    <string name="kiosk_action_copy_adb">ADB コマンドをコピー</string>
+    <string name="kiosk_adb_copied">ADB コマンドをクリップボードにコピーしました</string>
+    <string name="kiosk_scan_prompt_register">鍵として使う任意の QR コードをカメラにかざしてください</string>
+    <string name="kiosk_scan_prompt_lock">登録済みの QR コードをかざして Kiosk ロックを開始します</string>
+    <string name="kiosk_scan_prompt_unlock">登録済みの QR コードをかざして Kiosk ロックを解除します</string>
+    <string name="kiosk_scan_mismatch">登録された QR キーと一致しません</string>
+    <string name="kiosk_qr_registered_toast">QR コードを Kiosk キーとして登録しました</string>
+    <string name="kiosk_locked_toast">Kiosk ロックを開始しました</string>
+    <string name="kiosk_unlocked_toast">Kiosk ロックを解除しました</string>
+    <string name="kiosk_camera_permission_required">QR コードの読み取りにはカメラ権限が必要です</string>
+    <string name="kiosk_switch_camera">カメラ切替</string>
+    <string name="kiosk_toggle_torch">ライト切替</string>
+    <string name="kiosk_external_blocked">Kiosk ロック中は外部アプリを開けません（自由時間中または解除後に利用可能）</string>
+    <string name="kiosk_reward_earned_snackbar">自由時間 +%1$d分 を獲得！（合計: %2$s）</string>
+    <string name="kiosk_break_started_toast">自由時間を開始しました（%s）</string>
+    <string name="kiosk_break_ended_toast">自由時間が終了しました。学習画面に戻ります</string>
+    <string name="kiosk_break_notification_channel">Kiosk 自由時間タイマー</string>
+    <string name="kiosk_break_notification_title">Kiosk 自由時間中</string>
+    <string name="kiosk_break_notification_text">他アプリ利用可能 — 残り時間: %s</string>
     <string name="leech_suspend_notification">このカードに \"leech\"  (苦戦、忘却多発) というタグを付け、学習を休止しました</string>
     <string name="leech_notification">このカードに \"leech\" (苦戦、忘却多発) というタグを付けました</string>
     <string name="webview_crash_unknown">原因不明のエラー</string>

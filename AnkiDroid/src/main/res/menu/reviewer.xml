@@ -254,4 +254,9 @@
         android:icon="@drawable/user_action_9"
         android:title="@string/user_action_9"
         />
+    <item
+        android:id="@id/action_kiosk_mode"
+        android:title="@string/kiosk_mode"
+        ankidroid:showAsAction="never"
+        />
 </menu>

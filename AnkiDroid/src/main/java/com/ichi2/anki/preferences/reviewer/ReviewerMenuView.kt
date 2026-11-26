@@ -64,6 +64,14 @@ class ReviewerMenuView : LinearLayout {
         binding.overflowMenuView.setOnMenuItemClickListener(listener)
     }
 
+    fun addOverflowMenuItem(
+        id: Int,
+        title: CharSequence,
+    ) {
+        if (overflowMenu.findItem(id) != null) return
+        overflowMenu.add(Menu.NONE, id, Menu.NONE, title)?.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+    }
+
     fun addActions(
         alwaysShow: List<ViewerAction>,
         menuOnly: List<ViewerAction>,

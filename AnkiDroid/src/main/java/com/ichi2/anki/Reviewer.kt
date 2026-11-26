@@ -91,6 +91,8 @@ import com.ichi2.anki.common.utils.android.HandlerUtils.getDefaultLooper
 import com.ichi2.anki.common.utils.android.showThemedToast
 import com.ichi2.anki.common.utils.ext.unregisterReceiverSilently
 import com.ichi2.anki.compat.CompatHelper.Companion.registerReceiverCompat
+import com.ichi2.anki.kiosk.KioskManager
+import com.ichi2.anki.kiosk.KioskStatusDialogFragment
 import com.ichi2.anki.libanki.Card
 import com.ichi2.anki.libanki.CardId
 import com.ichi2.anki.libanki.Collection
@@ -943,6 +945,7 @@ open class Reviewer :
             R.id.user_action_7 -> userAction(7)
             R.id.user_action_8 -> userAction(8)
             R.id.user_action_9 -> userAction(9)
+            R.id.action_kiosk_mode -> KioskStatusDialogFragment.show(supportFragmentManager)
             else -> {
                 return super.onOptionsItemSelected(item)
             }
@@ -1632,6 +1635,20 @@ open class Reviewer :
             }
         }.also {
             previousCardId = cardId
+            val rewardUpdate = KioskManager.onCardsReviewed(this)
+            if (rewardUpdate != null && rewardUpdate.grantedMinutes > 0) {
+                val message =
+                    getString(
+                        R.string.kiosk_reward_earned_snackbar,
+                        rewardUpdate.grantedMinutes,
+                        KioskManager.formatDuration(rewardUpdate.totalBankedMillis),
+                    )
+                showSnackbar(message, Snackbar.LENGTH_LONG) {
+                    setAction(R.string.kiosk_mode) {
+                        KioskStatusDialogFragment.show(supportFragmentManager)
+                    }
+                }
+            }
             if (rating == Rating.AGAIN && wasLeech) {
                 state.topCard.load(getColUnsafe)
                 val leechMessage: String =

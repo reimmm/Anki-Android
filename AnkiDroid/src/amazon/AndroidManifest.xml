@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:installLocation="auto">
-</manifest> 
+    <uses-permission
+        android:name="android.permission.CAMERA"
+        tools:node="remove" />
+</manifest>

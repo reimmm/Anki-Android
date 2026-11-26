@@ -40,6 +40,7 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import anki.scheduler.CardAnswer.Rating
+import com.google.android.material.snackbar.Snackbar
 import com.ichi2.anki.CollectionManager
 import com.ichi2.anki.DispatchKeyEventListener
 import com.ichi2.anki.Flag
@@ -57,6 +58,8 @@ import com.ichi2.anki.databinding.FragmentReviewerBinding
 import com.ichi2.anki.dialogs.showDeckOptionsSelectionDialog
 import com.ichi2.anki.dialogs.tags.TagsDialogFactory
 import com.ichi2.anki.dialogs.tags.TagsDialogListener
+import com.ichi2.anki.kiosk.KioskManager
+import com.ichi2.anki.kiosk.KioskStatusDialogFragment
 import com.ichi2.anki.model.CardStateFilter
 import com.ichi2.anki.preferences.reviewer.ViewerAction
 import com.ichi2.anki.previewer.CardViewerActivity
@@ -274,6 +277,22 @@ class ReviewerFragment :
             soundFeedback?.playAnswerFeedback(ease)
         }
 
+        KioskManager.rewardEarnedFlow.flowWithLifecycle(lifecycle).collectIn(lifecycleScope) { rewardUpdate ->
+            if (rewardUpdate.grantedMinutes > 0) {
+                val message =
+                    getString(
+                        R.string.kiosk_reward_earned_snackbar,
+                        rewardUpdate.grantedMinutes,
+                        KioskManager.formatDuration(rewardUpdate.totalBankedMillis),
+                    )
+                showSnackbar(message, Snackbar.LENGTH_LONG) {
+                    setAction(R.string.kiosk_mode) {
+                        KioskStatusDialogFragment.show(parentFragmentManager)
+                    }
+                }
+            }
+        }
+
         if (Prefs.showAnswerFeedback) {
             viewModel.answerFeedbackFlow.collectIn(lifecycleScope) { ease ->
                 val drawableId =
@@ -406,6 +425,10 @@ class ReviewerFragment :
     override fun onMenuItemClick(item: MenuItem): Boolean {
         Timber.v("ReviewerFragment::onMenuItemClick %s", item)
         if (item.hasSubMenu()) return false
+        if (item.itemId == R.id.action_kiosk_mode) {
+            KioskStatusDialogFragment.show(parentFragmentManager)
+            return true
+        }
         val action = ViewerAction.fromId(item.itemId)
         viewModel.executeAction(action)
         return true
@@ -483,6 +506,7 @@ class ReviewerFragment :
     private fun setupMenu() {
         binding.reviewerMenuView.apply {
             setup(lifecycle, viewModel)
+            addOverflowMenuItem(R.id.action_kiosk_mode, getString(R.string.kiosk_mode))
             setOnMenuItemClickListener(this@ReviewerFragment)
         }
     }

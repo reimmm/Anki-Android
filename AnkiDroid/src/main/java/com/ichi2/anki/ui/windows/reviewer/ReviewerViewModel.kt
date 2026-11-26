@@ -17,6 +17,7 @@ import com.ichi2.anki.Reviewer
 import com.ichi2.anki.asyncIO
 import com.ichi2.anki.cardviewer.CardMediaPlayer
 import com.ichi2.anki.cardviewer.SingleCardSide
+import com.ichi2.anki.common.android.appContext
 import com.ichi2.anki.common.annotations.NeedsTest
 import com.ichi2.anki.common.destinations.BrowserDestination
 import com.ichi2.anki.common.destinations.CardInfoDestination
@@ -25,6 +26,7 @@ import com.ichi2.anki.common.destinations.DeckOptionsDestination
 import com.ichi2.anki.common.destinations.DeckOptionsEntry
 import com.ichi2.anki.common.destinations.NoteEditorDestination
 import com.ichi2.anki.common.destinations.StatisticsDestination
+import com.ichi2.anki.kiosk.KioskManager
 import com.ichi2.anki.launchCatchingIO
 import com.ichi2.anki.libanki.Card
 import com.ichi2.anki.libanki.CardId
@@ -590,6 +592,7 @@ class ReviewerViewModel(
             }
 
         undoableOp(handler = this) { sched.answerCard(answer) }
+        KioskManager.onCardsReviewed(appContext)
         answerFeedbackFlow.emit(rating)
         savedStateHandle[KEY_PREVIOUS_CARD_ID] = card.id
 

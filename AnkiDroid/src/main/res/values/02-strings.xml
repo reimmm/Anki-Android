@@ -63,6 +63,42 @@
     <string name="hide_toolbar" maxLength="28">Hide toolbar</string>
     <string name="replay_media" maxLength="28">Replay media</string>
     <string name="replay_answer_media" maxLength="28">Replay answer media</string>
+    <string name="kiosk_mode" maxLength="28">Kiosk mode</string>
+    <string name="kiosk_status_locked">Status: Locked</string>
+    <string name="kiosk_status_break">Status: Break active (%s remaining)</string>
+    <string name="kiosk_status_unlocked">Status: Unlocked</string>
+    <string name="kiosk_device_owner_active">Device Owner: Enabled</string>
+    <string name="kiosk_device_owner_inactive">Device Owner: Not enabled (run via ADB:\n%s)</string>
+    <string name="kiosk_qr_status_registered">QR key: Registered</string>
+    <string name="kiosk_qr_status_unregistered">QR key: Not registered</string>
+    <string name="kiosk_reward_rule_summary">Reward rule: %1$d cards = %2$d min break</string>
+    <string name="kiosk_reward_progress_summary">Next reward in %1$d cards (%2$d / %3$d)</string>
+    <string name="kiosk_reward_banked_summary">Available break time: %s</string>
+    <string name="kiosk_action_register_qr">Register QR key</string>
+    <string name="kiosk_action_change_qr">Change QR key</string>
+    <string name="kiosk_action_lock_qr">Scan QR to lock</string>
+    <string name="kiosk_action_unlock_qr">Scan QR to unlock</string>
+    <string name="kiosk_action_start_break">Use break time (%s)</string>
+    <string name="kiosk_action_end_break_early">Return to study (save remaining time)</string>
+    <string name="kiosk_action_copy_adb">Copy ADB command</string>
+    <string name="kiosk_adb_copied">Copied ADB command to clipboard</string>
+    <string name="kiosk_scan_prompt_register">Point the camera at any QR code to register it as your Kiosk key</string>
+    <string name="kiosk_scan_prompt_lock">Scan your registered QR code to start Kiosk lock</string>
+    <string name="kiosk_scan_prompt_unlock">Scan your registered QR code to unlock Kiosk mode</string>
+    <string name="kiosk_scan_mismatch">This QR code does not match the registered key</string>
+    <string name="kiosk_qr_registered_toast">Registered QR code as Kiosk key</string>
+    <string name="kiosk_locked_toast">Kiosk mode locked</string>
+    <string name="kiosk_unlocked_toast">Kiosk mode unlocked</string>
+    <string name="kiosk_camera_permission_required">Camera permission is required to scan QR codes</string>
+    <string name="kiosk_switch_camera">Switch camera</string>
+    <string name="kiosk_toggle_torch">Toggle flashlight</string>
+    <string name="kiosk_external_blocked">External apps are blocked while Kiosk is locked</string>
+    <string name="kiosk_reward_earned_snackbar">Earned +%1$d min break time (total: %2$s)</string>
+    <string name="kiosk_break_started_toast">Break started (%s)</string>
+    <string name="kiosk_break_ended_toast">Break ended — returning to study</string>
+    <string name="kiosk_break_notification_channel">Kiosk break timer</string>
+    <string name="kiosk_break_notification_title">Kiosk break active</string>
+    <string name="kiosk_break_notification_text">Remaining free time: %s</string>
     <string name="leech_suspend_notification">Card marked as leech and suspended</string>
     <string name="leech_notification">Card marked as leech</string>
     <string name="webview_crash_unknown">Unknown error</string>

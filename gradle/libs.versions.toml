@@ -33,6 +33,8 @@ androidxAppCompat = "1.8.0"
 androidxBenchmark = "1.4.1"
 # https://developer.android.com/jetpack/androidx/releases/browser
 androidxBrowser = "1.10.0"
+# https://developer.android.com/jetpack/androidx/releases/camera
+androidxCamera = "1.4.2"
 # https://developer.android.com/jetpack/compose/bom/bom-mapping
 androidxComposeBillOfMaterials = "2026.06.01"
 # https://developer.android.com/jetpack/androidx/releases/constraintlayout
@@ -132,6 +134,7 @@ timber = "5.0.1"
 # In the past, releases have been published before the changelog
 triplet = "4.0.0"
 turbine = "1.2.1"
+zxingCore = "3.5.3"
 
 [libraries]
 acra-limiter = { module = "ch.acra:acra-limiter", version.ref = "acra" }
@@ -145,6 +148,11 @@ androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", vers
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCoreKtx" }
 androidx-draganddrop = { module = "androidx.draganddrop:draganddrop", version.ref = "androidxDragAndDrop" }
 androidx-browser = { module = "androidx.browser:browser", version.ref = "androidxBrowser" }
+androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "androidxCamera" }
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "androidxCamera" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "androidxCamera" }
+androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "androidxCamera" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxingCore" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidxAppCompat" }
 androidx-benchmark-macro-junit4 = { module = "androidx.benchmark:benchmark-macro-junit4", version.ref = "androidxBenchmark" }
 androidx-annotation = { module = "androidx.annotation:annotation", version.ref = "androidxAnnotation" }

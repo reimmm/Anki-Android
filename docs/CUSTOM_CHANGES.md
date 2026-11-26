@@ -33,7 +33,7 @@
 
 ---
 
-## 3. 主な変更内容（6領域）
+## 3. 主な変更内容（7領域）
 
 ### 3.1 Auto Advance（自動進行）のタイマー・状態遷移バグ修正
 
@@ -127,6 +127,29 @@
 
 ---
 
+### 3.7 Kiosk モード（任意 QR ロック／解除 & 学習カード数に応じた自由時間）
+
+ADB の Device Owner（`LockTask`）権限を利用して、端末で **AnkiDroid AA のみ** を起動する Kiosk モードを実装しました。音量ボタンと電源ボタン（スリープ／電源メニュー）はロック中もそのまま使用できます。
+
+- **任意の QR コードによるロック／解除（`KioskQrScannerActivity`, `KioskQrDecoder`, `KioskManager`）**
+  - CameraX + ZXing によるオフライン内蔵 QR スキャナーを搭載（背面／前面カメラ切替・ライト・暗所／反転 QR 対応）。
+  - アンロック状態で任意の QR コードをスキャンして鍵として登録（SHA-256 ハッシュのみ保存）し、同じ QR コードでロックおよび解除を行います。
+- **ADB Device Owner による強固な Kiosk 制御（`KioskDeviceAdminReceiver`, `KioskHomeActivity`, `KioskBootReceiver`, `AnkiActivity`, `ManageSpaceActivity`）**
+  - ロック中は `setLockTaskPackages` + `setLockTaskFeatures(LOCK_TASK_FEATURE_GLOBAL_ACTIONS or LOCK_TASK_FEATURE_SYSTEM_INFO)` を適用し、ホーム／最近使ったアプリ／通知シェード／外部リンク・共有を遮断しつつ、**音量ボタンと電源ボタンは使用可能**に維持します。
+  - `KioskHomeActivity` を永続ホーム（`CATEGORY_HOME`）に設定し、端末再起動後も自動で AnkiDroid に復帰して再ロックします。
+  - Device Owner 初期設定コマンド（1回のみ）：
+    ```bash
+    adb shell dpm set-device-owner com.ichi2.anki.autoadvance/com.ichi2.anki.kiosk.KioskDeviceAdminReceiver
+    ```
+- **学習カード数に応じた他アプリ利用（自由時間）機能（`KioskManager`, `KioskBreakTimerService`, `KioskStatusDialogFragment`, `Undo.kt`）**
+  - Kiosk ロック中の回答カード数を集計し、一定数ごとに他アプリを使える自由時間（休憩タイム）を付与します（デフォルト：**100問ごとに10分**）。
+  - Undo（取り消し）による水増しを防止する単調増加カウンタ（`rewarded_units`）と `revlog` 差分補正を実装。
+  - 自由時間中は `KioskBreakTimerService` が残り時間を通知バーでカウントダウンし、「学習に戻る」ボタンで残り時間を温存して早期再ロック可能。時間切れになると自動で AnkiDroid を最前面に戻して再ロックします。
+- **ビルド前カスタマイズ（`gradle.properties` / Gradle プロパティ）**
+  - `gradle.properties` の `kioskRewardCards=100` / `kioskRewardMinutes=10`、またはビルド時引数 `-PkioskRewardCards=50 -PkioskRewardMinutes=5` で `BuildConfig.KIOSK_REWARD_CARDS` / `BuildConfig.KIOSK_REWARD_MINUTES` を自由に変更できます。
+
+---
+
 ## 4. 追加された設定・コントロール一覧
 
 | 種別 | 場所 | 名称（日本語 / 英語） | Preference Key / ID | デフォルト |
@@ -134,6 +157,8 @@
 | 設定スイッチ | `設定 > 学習画面` | Good の効果音を鳴らさない / `Mute Good answer sound` | `soundFeedbackMuteGood` | `false` |
 | 設定スイッチ | `設定 > 復習` | 学習中は背景音楽の音量を下げ続ける / `Duck background music while studying` | `duckBackgroundAudio` | `true` |
 | コントロール | `設定 > コントロール` | 回答のメディアを再再生 / `Replay answer media` | `binding_PLAY_ANSWER_MEDIA` | 割り当てなし |
+| メニュー | デッキ一覧 / 学習画面メニュー | Kiosk モード / `Kiosk mode` | `R.id.action_kiosk_mode` | — |
+| ビルド設定 | `gradle.properties` | Kiosk 自由時間の必要カード数 / 付与分数 | `kioskRewardCards` / `kioskRewardMinutes` | `100` / `10` |
 | Broadcast | 学習画面表示中のみ | Auto Advance ON/OFF トグル | `com.ichi2.anki.TOGGLE_AUTO_ADVANCE` | — |
 
 ---

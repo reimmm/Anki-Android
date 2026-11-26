@@ -3,8 +3,12 @@
 
 package com.ichi2.anki.ui.windows.managespace
 
+import android.os.Bundle
 import androidx.fragment.app.Fragment
+import com.ichi2.anki.R
 import com.ichi2.anki.SingleFragmentActivity
+import com.ichi2.anki.common.utils.android.showThemedToast
+import com.ichi2.anki.kiosk.KioskManager
 
 /**
  * This activity is called by the system from the app settings to let the user manage the app's
@@ -15,5 +19,15 @@ import com.ichi2.anki.SingleFragmentActivity
  * @see SingleFragmentActivity.onCreate
  */
 class ManageSpaceActivity : SingleFragmentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        if (KioskManager.isKioskLocked(this)) {
+            super.onCreate(savedInstanceState)
+            showThemedToast(this, R.string.kiosk_external_blocked, false)
+            finish()
+            return
+        }
+        super.onCreate(savedInstanceState)
+    }
+
     override fun createFragment(): Fragment = ManageSpaceFragment()
 }

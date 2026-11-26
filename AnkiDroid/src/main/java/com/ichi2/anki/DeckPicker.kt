@@ -156,6 +156,7 @@ import com.ichi2.anki.export.ExportDialogFragment
 import com.ichi2.anki.filtered.FilteredDeckOptionsFragment
 import com.ichi2.anki.introduction.CollectionPermissionScreenLauncher
 import com.ichi2.anki.introduction.hasCollectionStoragePermissions
+import com.ichi2.anki.kiosk.KioskStatusDialogFragment
 import com.ichi2.anki.libanki.DeckId
 import com.ichi2.anki.libanki.sched.DeckNode
 import com.ichi2.anki.mediacheck.MediaCheckFragment
@@ -1457,6 +1458,11 @@ open class DeckPicker :
             R.id.action_create_backup -> {
                 Timber.i("DeckPicker::Create backup")
                 createBackup()
+                return true
+            }
+            R.id.action_kiosk_mode -> {
+                Timber.i("DeckPicker::Kiosk mode")
+                KioskStatusDialogFragment.show(supportFragmentManager)
                 return true
             }
             else -> return super.onOptionsItemSelected(item)

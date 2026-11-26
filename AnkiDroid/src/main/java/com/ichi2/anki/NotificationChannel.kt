@@ -42,14 +42,18 @@ fun setupNotificationChannels(context: Context) {
 
         // Vibration is enabled by default, but the user can turn it off from the system settings
         // Vibration will also not occur if the phone has been set to silent
-        val notificationChannel =
+        val builder =
             NotificationChannelCompat
                 .Builder(id, channel.importance)
                 .setName(name)
-                .setShowBadge(true)
-                .setVibrationPattern(longArrayOf(0, 500))
-                .setVibrationEnabled(true)
-                .build()
+                .setShowBadge(channel != NotificationChannel.KIOSK_BREAK)
+        if (channel != NotificationChannel.KIOSK_BREAK) {
+            builder.setVibrationPattern(longArrayOf(0, 500))
+            builder.setVibrationEnabled(true)
+        } else {
+            builder.setVibrationEnabled(false)
+        }
+        val notificationChannel = builder.build()
 
         manager.createNotificationChannel(notificationChannel)
     }
@@ -70,6 +74,7 @@ enum class NotificationChannel(
     GENERAL("General Notifications", R.string.app_name, NotificationManagerCompat.IMPORTANCE_DEFAULT),
     SYNC("Synchronization", R.string.sync_title, NotificationManagerCompat.IMPORTANCE_LOW),
     REVIEW_REMINDERS("Review Reminders", R.string.review_reminders_do_not_translate, NotificationManagerCompat.IMPORTANCE_DEFAULT),
+    KIOSK_BREAK("Kiosk Break Timer", R.string.kiosk_break_notification_channel, NotificationManagerCompat.IMPORTANCE_LOW),
     ;
 
     fun getName(res: Resources) = res.getString(nameId)

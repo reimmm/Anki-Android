@@ -149,6 +149,14 @@ android {
 
         def apiKey = properties.getProperty("ANALYTICS_API_KEY") ?: System.getenv("ANALYTICS_API_KEY") ?: "DUMMY_API_XXX"
         buildConfigField "String", "ANALYTICS_API_KEY", "\"${apiKey}\""
+
+        def kioskRewardCards = (project.findProperty("kioskRewardCards") ?: "100").toString().toInteger()
+        def kioskRewardMinutes = (project.findProperty("kioskRewardMinutes") ?: "10").toString().toInteger()
+        if (kioskRewardCards <= 0 || kioskRewardMinutes <= 0) {
+            throw new GradleException("kioskRewardCards (${kioskRewardCards}) and kioskRewardMinutes (${kioskRewardMinutes}) must be positive integers")
+        }
+        buildConfigField "int", "KIOSK_REWARD_CARDS", "${kioskRewardCards}"
+        buildConfigField "int", "KIOSK_REWARD_MINUTES", "${kioskRewardMinutes}"
     }
     signingConfigs {
         release {
@@ -708,7 +716,12 @@ dependencies {
     implementation libs.androidx.annotation
     implementation libs.androidx.appcompat
     implementation libs.androidx.browser
+    implementation libs.androidx.camera.core
+    implementation libs.androidx.camera.camera2
+    implementation libs.androidx.camera.lifecycle
+    implementation libs.androidx.camera.view
     implementation libs.androidx.core.ktx
+    implementation libs.zxing.core
     implementation libs.androidx.draganddrop
     implementation libs.androidx.exifinterface
     implementation libs.androidx.fragment.ktx

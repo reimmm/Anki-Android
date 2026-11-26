@@ -21,20 +21,34 @@ import androidx.fragment.app.FragmentActivity
 import anki.collection.OpChangesAfterUndo
 import com.google.android.material.snackbar.Snackbar
 import com.ichi2.anki.CollectionManager.TR
+import com.ichi2.anki.common.android.appContext
+import com.ichi2.anki.common.time.TimeManager
+import com.ichi2.anki.kiosk.KioskManager
 import com.ichi2.anki.libanki.redoAvailable
 import com.ichi2.anki.libanki.undoAvailable
 import com.ichi2.anki.observability.undoableOp
 import com.ichi2.anki.snackbar.showSnackbar
 
+private const val KIOSK_REVLOG_LOOKBACK_MS = 7L * 86_400_000L
+
 suspend fun tryUndo(): String {
+    var revlogDelta = 0
     val changes =
         undoableOp {
             if (undoAvailable()) {
-                undo()
+                val cutoff = TimeManager.time.intTimeMS() - KIOSK_REVLOG_LOOKBACK_MS
+                val before = db.queryScalar("SELECT COUNT(*) FROM revlog WHERE id >= ?", cutoff)
+                val result = undo()
+                val after = db.queryScalar("SELECT COUNT(*) FROM revlog WHERE id >= ?", cutoff)
+                revlogDelta = after - before
+                result
             } else {
                 OpChangesAfterUndo.getDefaultInstance()
             }
         }
+    if (revlogDelta < 0) {
+        KioskManager.onReviewsReverted(appContext, -revlogDelta)
+    }
     return if (changes.operation.isEmpty()) {
         TR.actionsNothingToUndo()
     } else {
@@ -43,14 +57,23 @@ suspend fun tryUndo(): String {
 }
 
 suspend fun tryRedo(): String {
+    var revlogDelta = 0
     val changes =
         undoableOp {
             if (redoAvailable()) {
-                redo()
+                val cutoff = TimeManager.time.intTimeMS() - KIOSK_REVLOG_LOOKBACK_MS
+                val before = db.queryScalar("SELECT COUNT(*) FROM revlog WHERE id >= ?", cutoff)
+                val result = redo()
+                val after = db.queryScalar("SELECT COUNT(*) FROM revlog WHERE id >= ?", cutoff)
+                revlogDelta = after - before
+                result
             } else {
                 OpChangesAfterUndo.getDefaultInstance()
             }
         }
+    if (revlogDelta > 0) {
+        KioskManager.onCardsReviewed(appContext, revlogDelta)
+    }
     return if (changes.operation.isEmpty()) {
         TR.actionsNothingToRedo()
     } else {
