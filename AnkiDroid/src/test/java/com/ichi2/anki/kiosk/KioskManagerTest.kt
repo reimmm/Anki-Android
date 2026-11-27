@@ -265,4 +265,42 @@ class KioskManagerTest : RobolectricTest() {
             assertEquals(0, update.progressInCurrentUnit)
             assertEquals(2, update.cardsUntilNextReward)
         }
+
+    @Test
+    fun `unlockWithQr and re-lock preserve banked break time, active break remainder, and card progress`() {
+        val mockTime = MockTime(1_700_000_000_000L)
+        TimeManager.resetWith(mockTime)
+
+        KioskManager.rewardCardsOverride = 100
+        KioskManager.rewardMinutesOverride = 10
+        KioskManager.registerQrKey(targetContext, "qr-keep")
+        KioskManager.lockWithQr(activity, "qr-keep")
+
+        // Earn 10 min break + 60 cards progress toward next reward
+        KioskManager.onCardsReviewed(targetContext, 160)
+        assertEquals(10L * 60_000L, KioskManager.getBankedBreakMillis(targetContext))
+        assertEquals(60, KioskManager.getStatusSnapshot(targetContext).progressInCurrentUnit)
+
+        // Start break and consume 3 minutes (7 minutes remaining)
+        KioskManager.startBreak(activity)
+        mockTime.addM(3)
+        assertEquals(7L * 60_000L, KioskManager.getRemainingBreakMillis(targetContext))
+
+        // Unlock via QR: remaining 7 minutes and 60-card progress must be preserved (NOT zeroed)
+        assertTrue(KioskManager.unlockWithQr(activity, "qr-keep"))
+        assertFalse(KioskManager.isKioskLocked(targetContext))
+        assertEquals(7L * 60_000L, KioskManager.getBankedBreakMillis(targetContext))
+        assertEquals(60, KioskManager.getStatusSnapshot(targetContext).progressInCurrentUnit)
+
+        // Re-lock via QR: banked 7 minutes and 60-card progress remain intact
+        assertTrue(KioskManager.lockWithQr(activity, "qr-keep"))
+        assertEquals(7L * 60_000L, KioskManager.getBankedBreakMillis(targetContext))
+        assertEquals(60, KioskManager.getStatusSnapshot(targetContext).progressInCurrentUnit)
+
+        // Answering 40 more cards reaches 100 and adds +10 min (total 17 min)
+        val earned = KioskManager.onCardsReviewed(targetContext, 40)!!
+        assertEquals(10, earned.grantedMinutes)
+        assertEquals(17L * 60_000L, KioskManager.getBankedBreakMillis(targetContext))
+        assertEquals(0, KioskManager.getStatusSnapshot(targetContext).progressInCurrentUnit)
+    }
 }

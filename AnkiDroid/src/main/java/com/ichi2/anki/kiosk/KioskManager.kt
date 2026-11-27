@@ -46,6 +46,7 @@ object KioskManager {
     private const val KEY_BANKED_BREAK_MS = "banked_break_ms"
     private const val KEY_BREAK_END_MS = "break_end_epoch_ms"
     private const val KEY_LOCK_STARTED_MS = "lock_started_epoch_ms"
+    private const val KEY_CARRYOVER_CARDS = "carryover_reviewed_cards"
     private const val BREAK_ALARM_REQUEST_CODE = 29401
 
     @VisibleForTesting
@@ -190,6 +191,7 @@ object KioskManager {
 
     /**
      * Verifies [rawPayload] and activates Kiosk lock if it matches the registered QR key.
+     * Preserves any previously banked break time and carried-over card progress.
      */
     fun lockWithQr(
         activity: Activity,
@@ -198,13 +200,17 @@ object KioskManager {
         if (!verifyQrKey(activity, rawPayload)) return false
         cancelBreakAlarm(activity)
         KioskBreakTimerService.stop(activity)
+        val p = prefs(activity)
+        val carryover = p.getLong(KEY_CARRYOVER_CARDS, 0L).coerceAtLeast(0L)
+        val existingBanked = p.getLong(KEY_BANKED_BREAK_MS, 0L).coerceAtLeast(0L)
         val now = TimeManager.time.intTimeMS()
-        prefs(activity).edit {
+        p.edit {
             putBoolean(KEY_IS_LOCKED, true)
             putLong(KEY_LOCK_STARTED_MS, now)
-            putLong(KEY_NET_REVIEWED_CARDS, 0L)
+            putLong(KEY_CARRYOVER_CARDS, carryover)
+            putLong(KEY_NET_REVIEWED_CARDS, carryover)
             putLong(KEY_REWARDED_UNITS, 0L)
-            putLong(KEY_BANKED_BREAK_MS, 0L)
+            putLong(KEY_BANKED_BREAK_MS, existingBanked)
             putLong(KEY_BREAK_END_MS, 0L)
         }
         syncSystemPolicies(activity)
@@ -213,21 +219,26 @@ object KioskManager {
     }
 
     /**
-     * Verifies [rawPayload] and unlocks Kiosk mode (including canceling any active reward break).
+     * Verifies [rawPayload] and unlocks Kiosk mode while preserving banked break time
+     * (including any remaining time from an active break) and current card progress.
      */
     fun unlockWithQr(
         activity: Activity,
         rawPayload: String,
     ): Boolean {
         if (!verifyQrKey(activity, rawPayload)) return false
+        val remainingActiveBreak = getRemainingBreakMillis(activity)
+        val preservedBanked = getBankedBreakMillis(activity) + remainingActiveBreak
+        val carryover = getStatusSnapshot(activity).progressInCurrentUnit.toLong().coerceAtLeast(0L)
         cancelBreakAlarm(activity)
         KioskBreakTimerService.stop(activity)
         prefs(activity).edit {
             putBoolean(KEY_IS_LOCKED, false)
             putLong(KEY_LOCK_STARTED_MS, 0L)
-            putLong(KEY_NET_REVIEWED_CARDS, 0L)
+            putLong(KEY_CARRYOVER_CARDS, carryover)
+            putLong(KEY_NET_REVIEWED_CARDS, carryover)
             putLong(KEY_REWARDED_UNITS, 0L)
-            putLong(KEY_BANKED_BREAK_MS, 0L)
+            putLong(KEY_BANKED_BREAK_MS, preservedBanked)
             putLong(KEY_BREAK_END_MS, 0L)
         }
         syncSystemPolicies(activity)
@@ -308,6 +319,7 @@ object KioskManager {
         if (!isKioskLocked(context)) return null
         val lockStartedMs = getLockStartedEpochMillis(context)
         if (lockStartedMs <= 0L) return null
+        val carryover = prefs(context).getLong(KEY_CARRYOVER_CARDS, 0L).coerceAtLeast(0L)
         val revlogCount =
             runCatching {
                 withCol {
@@ -319,7 +331,7 @@ object KioskManager {
             }.onFailure { e ->
                 Timber.w(e, "Failed to reconcile Kiosk reviewed cards from revlog")
             }.getOrNull() ?: return null
-        return reconcileReviewedCards(context, revlogCount)
+        return reconcileReviewedCards(context, carryover + revlogCount)
     }
 
     /**
