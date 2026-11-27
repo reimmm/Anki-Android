@@ -7,7 +7,7 @@
 
 ## ダウンロード
 
-- **GitHub Releases（推奨）**: [`v2.25.3-aa.3`](https://github.com/reimmm/Anki-Android/releases/tag/v2.25.3-aa.3)
+- **GitHub Releases（推奨）**: [`v2.25.3-aa.4`](https://github.com/reimmm/Anki-Android/releases/tag/v2.25.3-aa.4)
 - **このブランチの最新 APK**: [`AnkiDroid-AA-arm64-v8a.apk`](./AnkiDroid-AA-arm64-v8a.apk)
 
 | 項目 | 値 |
@@ -15,10 +15,10 @@
 | ファイル名 | `AnkiDroid-AA-arm64-v8a.apk` |
 | アプリ名 / パッケージ名 | `AnkiDroid AA` / `com.ichi2.anki.autoadvance`（公式版と共存可） |
 | ベース / バージョン | `v2.25.3`（`versionCode = 322503300`） |
-| ソースコミット | [`0674d9e602`](https://github.com/reimmm/Anki-Android/commit/0674d9e602)（[`stable/v2.25.3-auto-advance`](https://github.com/reimmm/Anki-Android/tree/stable/v2.25.3-auto-advance)） |
+| ソースコミット | [`aca36c3ae5`](https://github.com/reimmm/Anki-Android/commit/aca36c3ae5)（[`stable/v2.25.3-auto-advance`](https://github.com/reimmm/Anki-Android/tree/stable/v2.25.3-auto-advance)） |
 | 対応 ABI / SDK | `arm64-v8a`（Android 7.0 `minSdk 24` 〜 Android 16 `targetSdk 36`） |
 | サイズ | `41,799,691 bytes`（約 39.9 MB） |
-| SHA-256 | `92f4f6fb863170cbb03cc6bfdcbe3325834fb5e101b2633df4dbbcd9b431ee07` |
+| SHA-256 | `c9a9843ec2d4d4afe125f9d18ed671253211aed152a992e8d4475b60dc4ab823` |
 
 ---
 
