@@ -15,10 +15,12 @@ import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.UserManager
 import androidx.annotation.VisibleForTesting
 import androidx.core.app.PendingIntentCompat
 import androidx.core.content.edit
 import com.ichi2.anki.BuildConfig
+import com.ichi2.anki.CollectionManager.withCol
 import com.ichi2.anki.DeckPicker
 import com.ichi2.anki.R
 import com.ichi2.anki.common.time.TimeManager
@@ -43,6 +45,7 @@ object KioskManager {
     private const val KEY_REWARDED_UNITS = "rewarded_units"
     private const val KEY_BANKED_BREAK_MS = "banked_break_ms"
     private const val KEY_BREAK_END_MS = "break_end_epoch_ms"
+    private const val KEY_LOCK_STARTED_MS = "lock_started_epoch_ms"
     private const val BREAK_ALARM_REQUEST_CODE = 29401
 
     @VisibleForTesting
@@ -183,6 +186,8 @@ object KioskManager {
         )
     }
 
+    fun getLockStartedEpochMillis(context: Context): Long = prefs(context).getLong(KEY_LOCK_STARTED_MS, 0L)
+
     /**
      * Verifies [rawPayload] and activates Kiosk lock if it matches the registered QR key.
      */
@@ -193,8 +198,10 @@ object KioskManager {
         if (!verifyQrKey(activity, rawPayload)) return false
         cancelBreakAlarm(activity)
         KioskBreakTimerService.stop(activity)
+        val now = TimeManager.time.intTimeMS()
         prefs(activity).edit {
             putBoolean(KEY_IS_LOCKED, true)
+            putLong(KEY_LOCK_STARTED_MS, now)
             putLong(KEY_NET_REVIEWED_CARDS, 0L)
             putLong(KEY_REWARDED_UNITS, 0L)
             putLong(KEY_BANKED_BREAK_MS, 0L)
@@ -217,6 +224,7 @@ object KioskManager {
         KioskBreakTimerService.stop(activity)
         prefs(activity).edit {
             putBoolean(KEY_IS_LOCKED, false)
+            putLong(KEY_LOCK_STARTED_MS, 0L)
             putLong(KEY_NET_REVIEWED_CARDS, 0L)
             putLong(KEY_REWARDED_UNITS, 0L)
             putLong(KEY_BANKED_BREAK_MS, 0L)
@@ -236,10 +244,26 @@ object KioskManager {
         count: Int = 1,
     ): RewardUpdate? {
         if (count <= 0 || !isKioskLocked(context)) return null
+        val currentNet = prefs(context).getLong(KEY_NET_REVIEWED_CARDS, 0L).coerceAtLeast(0L)
+        return reconcileReviewedCards(context, currentNet + count.toLong())
+    }
+
+    /**
+     * Reconciles the net reviewed card counter against an authoritative total (such as `revlog`
+     * rows recorded since Kiosk lock started, including reviews synced from other devices).
+     *
+     * [KEY_REWARDED_UNITS] remains monotonic so repeated syncs or Undo + re-answer never grant
+     * duplicate break time.
+     */
+    fun reconcileReviewedCards(
+        context: Context,
+        totalReviewedCardsSinceLock: Long,
+    ): RewardUpdate? {
+        if (!isKioskLocked(context)) return null
         val p = prefs(context)
         val perUnit = rewardCardsPerUnit.toLong()
         val minutesPerUnit = rewardMinutesPerUnit
-        val newNet = p.getLong(KEY_NET_REVIEWED_CARDS, 0L).coerceAtLeast(0L) + count.toLong()
+        val newNet = totalReviewedCardsSinceLock.coerceAtLeast(0L)
         val prevUnits = p.getLong(KEY_REWARDED_UNITS, 0L).coerceAtLeast(0L)
         val targetUnits = newNet / perUnit
         var banked = p.getLong(KEY_BANKED_BREAK_MS, 0L).coerceAtLeast(0L)
@@ -273,6 +297,29 @@ object KioskManager {
             _rewardEarnedFlow.tryEmit(update)
         }
         return update
+    }
+
+    /**
+     * Queries the Anki `revlog` table for actual card reviews recorded at or after Kiosk lock
+     * start (excluding manual reschedules where `type = 4` or `ease <= 0`) and updates the reward
+     * break state. This ensures reviews synced from PC/other devices are credited accurately.
+     */
+    suspend fun reconcileReviewedCardsFromCollection(context: Context): RewardUpdate? {
+        if (!isKioskLocked(context)) return null
+        val lockStartedMs = getLockStartedEpochMillis(context)
+        if (lockStartedMs <= 0L) return null
+        val revlogCount =
+            runCatching {
+                withCol {
+                    db.queryLongScalar(
+                        "SELECT COUNT(*) FROM revlog WHERE id >= ? AND ease > 0 AND type IN (0, 1, 2, 3)",
+                        lockStartedMs,
+                    )
+                }
+            }.onFailure { e ->
+                Timber.w(e, "Failed to reconcile Kiosk reviewed cards from revlog")
+            }.getOrNull() ?: return null
+        return reconcileReviewedCards(context, revlogCount)
     }
 
     /**
@@ -412,11 +459,18 @@ object KioskManager {
         val pkg = appCtx.packageName
 
         runCatching {
-            // Auto-grant CAMERA and POST_NOTIFICATIONS so permission dialogs never block inside LockTask
+            // Auto-grant CAMERA, RECORD_AUDIO, and POST_NOTIFICATIONS so permission dialogs
+            // never block inside LockTask
             dpm.setPermissionGrantState(
                 admin,
                 pkg,
                 Manifest.permission.CAMERA,
+                DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED,
+            )
+            dpm.setPermissionGrantState(
+                admin,
+                pkg,
+                Manifest.permission.RECORD_AUDIO,
                 DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED,
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -428,8 +482,16 @@ object KioskManager {
                 )
             }
 
-            // Prevent uninstalling AnkiDroid while Kiosk is locked (including during reward breaks)
+            // Prevent uninstalling AnkiDroid and prevent changing device clock while Kiosk is locked
+            // (including during reward breaks, so break timers and revlog timestamps cannot be bypassed)
             dpm.setUninstallBlocked(admin, pkg, locked)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                if (locked) {
+                    dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME)
+                } else {
+                    dpm.clearUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME)
+                }
+            }
 
             if (enforceLockNow) {
                 dpm.setLockTaskPackages(admin, arrayOf(pkg))

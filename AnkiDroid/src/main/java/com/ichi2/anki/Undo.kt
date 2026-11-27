@@ -37,9 +37,17 @@ suspend fun tryUndo(): String {
         undoableOp {
             if (undoAvailable()) {
                 val cutoff = TimeManager.time.intTimeMS() - KIOSK_REVLOG_LOOKBACK_MS
-                val before = db.queryScalar("SELECT COUNT(*) FROM revlog WHERE id >= ?", cutoff)
+                val before =
+                    db.queryScalar(
+                        "SELECT COUNT(*) FROM revlog WHERE id >= ? AND ease > 0 AND type IN (0, 1, 2, 3)",
+                        cutoff,
+                    )
                 val result = undo()
-                val after = db.queryScalar("SELECT COUNT(*) FROM revlog WHERE id >= ?", cutoff)
+                val after =
+                    db.queryScalar(
+                        "SELECT COUNT(*) FROM revlog WHERE id >= ? AND ease > 0 AND type IN (0, 1, 2, 3)",
+                        cutoff,
+                    )
                 revlogDelta = after - before
                 result
             } else {
@@ -62,9 +70,17 @@ suspend fun tryRedo(): String {
         undoableOp {
             if (redoAvailable()) {
                 val cutoff = TimeManager.time.intTimeMS() - KIOSK_REVLOG_LOOKBACK_MS
-                val before = db.queryScalar("SELECT COUNT(*) FROM revlog WHERE id >= ?", cutoff)
+                val before =
+                    db.queryScalar(
+                        "SELECT COUNT(*) FROM revlog WHERE id >= ? AND ease > 0 AND type IN (0, 1, 2, 3)",
+                        cutoff,
+                    )
                 val result = redo()
-                val after = db.queryScalar("SELECT COUNT(*) FROM revlog WHERE id >= ?", cutoff)
+                val after =
+                    db.queryScalar(
+                        "SELECT COUNT(*) FROM revlog WHERE id >= ? AND ease > 0 AND type IN (0, 1, 2, 3)",
+                        cutoff,
+                    )
                 revlogDelta = after - before
                 result
             } else {

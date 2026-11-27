@@ -197,4 +197,72 @@ class KioskManagerTest : RobolectricTest() {
             KioskManager.onCardsReviewed(targetContext)
             assertEquals(5L * 60_000L, KioskManager.getBankedBreakMillis(targetContext))
         }
+
+    @Test
+    fun `reconcileReviewedCards credits synced multi-unit progress idempotently`() {
+        KioskManager.rewardCardsOverride = 100
+        KioskManager.rewardMinutesOverride = 10
+        KioskManager.registerQrKey(targetContext, "qr-sync")
+        KioskManager.lockWithQr(activity, "qr-sync")
+        assertTrue(KioskManager.getLockStartedEpochMillis(targetContext) > 0L)
+
+        // Simulates syncing 250 cards reviewed on another device
+        val synced = KioskManager.reconcileReviewedCards(targetContext, 250L)!!
+        assertEquals(20, synced.grantedMinutes)
+        assertEquals(20L * 60_000L, synced.totalBankedMillis)
+        assertEquals(50, synced.progressInCurrentUnit)
+        assertEquals(50, synced.cardsUntilNextReward)
+
+        // Re-running sync with the same revlog total grants 0 duplicate minutes
+        val repeated = KioskManager.reconcileReviewedCards(targetContext, 250L)!!
+        assertEquals(0, repeated.grantedMinutes)
+        assertEquals(20L * 60_000L, KioskManager.getBankedBreakMillis(targetContext))
+
+        // Unlocking clears lock-started timestamp
+        KioskManager.unlockWithQr(activity, "qr-sync")
+        assertEquals(0L, KioskManager.getLockStartedEpochMillis(targetContext))
+    }
+
+    @Test
+    fun `reconcileReviewedCardsFromCollection counts synced revlog rows after lock and excludes manual reschedules`() =
+        runTest {
+            KioskManager.rewardCardsOverride = 2
+            KioskManager.rewardMinutesOverride = 10
+            KioskManager.registerQrKey(targetContext, "qr-sync-col")
+            KioskManager.lockWithQr(activity, "qr-sync-col")
+
+            val lockStartMs = KioskManager.getLockStartedEpochMillis(targetContext)
+            val note = addBasicNote("Sync Q", "Sync A")
+            val cardId = note.firstCard().id
+
+            // 1. Pre-lock review row (must NOT be counted)
+            col.db.execute(
+                "INSERT INTO revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type) VALUES (?, ?, -1, 3, 1, 0, 2500, 1000, 1)",
+                lockStartMs - 60_000L,
+                cardId,
+            )
+            // 2. Two post-lock review rows synced from another device (MUST be counted)
+            col.db.execute(
+                "INSERT INTO revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type) VALUES (?, ?, -1, 3, 1, 0, 2500, 1000, 0)",
+                lockStartMs + 1_000L,
+                cardId,
+            )
+            col.db.execute(
+                "INSERT INTO revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type) VALUES (?, ?, -1, 4, 4, 1, 2500, 1000, 1)",
+                lockStartMs + 2_000L,
+                cardId,
+            )
+            // 3. Post-lock manual reschedule row (type=4, ease=0 -> must NOT be counted)
+            col.db.execute(
+                "INSERT INTO revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type) VALUES (?, ?, -1, 0, 5, 4, 2500, 0, 4)",
+                lockStartMs + 3_000L,
+                cardId,
+            )
+
+            val update = KioskManager.reconcileReviewedCardsFromCollection(targetContext)!!
+            assertEquals(10, update.grantedMinutes)
+            assertEquals(10L * 60_000L, KioskManager.getBankedBreakMillis(targetContext))
+            assertEquals(0, update.progressInCurrentUnit)
+            assertEquals(2, update.cardsUntilNextReward)
+        }
 }

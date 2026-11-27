@@ -141,9 +141,10 @@ ADB の Device Owner（`LockTask`）権限を利用して、端末で **AnkiDroi
     ```bash
     adb shell dpm set-device-owner com.ichi2.anki.autoadvance/com.ichi2.anki.kiosk.KioskDeviceAdminReceiver
     ```
-- **学習カード数に応じた他アプリ利用（自由時間）機能（`KioskManager`, `KioskBreakTimerService`, `KioskStatusDialogFragment`, `Undo.kt`）**
-  - Kiosk ロック中の回答カード数を集計し、一定数ごとに他アプリを使える自由時間（休憩タイム）を付与します（デフォルト：**100問ごとに10分**）。
-  - Undo（取り消し）による水増しを防止する単調増加カウンタ（`rewarded_units`）と `revlog` 差分補正を実装。
+- **学習カード数に応じた他アプリ利用（自由時間）機能（`KioskManager`, `KioskBreakTimerService`, `KioskStatusDialogFragment`, `Sync.kt`, `Undo.kt`）**
+  - Kiosk ロック開始時刻（`lock_started_epoch_ms`）以降の実復習ログ（`revlog` の `ease > 0 AND type IN (0, 1, 2, 3)`）をソースとして集計し、一定数ごとに自由時間を付与します（デフォルト：**100問ごとに10分**）。
+  - **他端末（PC / iOS / Web 等）で学習して AnkiWeb Sync した分も自動反映**され、手動リスケジュール（`type = 4`）による誤カウントや、Undo／再同期による二重付与（水増し）を防止します。
+  - ロック中は Device Owner により `CAMERA` / `RECORD_AUDIO` / `POST_NOTIFICATIONS` を自動付与し、`DISALLOW_CONFIG_DATE_TIME` で端末時計の巻き戻しによるタイマー延長・`revlog` 改ざんを防止します。
   - 自由時間中は `KioskBreakTimerService` が残り時間を通知バーでカウントダウンし、「学習に戻る」ボタンで残り時間を温存して早期再ロック可能。時間切れになると自動で AnkiDroid を最前面に戻して再ロックします。
 - **ビルド前カスタマイズ（`gradle.properties` / Gradle プロパティ）**
   - `gradle.properties` の `kioskRewardCards=100` / `kioskRewardMinutes=10`、またはビルド時引数 `-PkioskRewardCards=50 -PkioskRewardMinutes=5` で `BuildConfig.KIOSK_REWARD_CARDS` / `BuildConfig.KIOSK_REWARD_MINUTES` を自由に変更できます。

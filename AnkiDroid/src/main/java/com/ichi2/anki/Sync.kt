@@ -14,6 +14,8 @@ import com.ichi2.anki.CollectionManager.TR
 import com.ichi2.anki.CollectionManager.withCol
 import com.ichi2.anki.common.time.TimeManager
 import com.ichi2.anki.dialogs.SyncErrorDialog
+import com.ichi2.anki.kiosk.KioskManager
+import com.ichi2.anki.kiosk.KioskStatusDialogFragment
 import com.ichi2.anki.observability.ChangeManager.notifySubscribersAllValuesChanged
 import com.ichi2.anki.settings.Prefs
 import com.ichi2.anki.settings.enums.ShouldFetchMedia
@@ -107,6 +109,20 @@ fun DeckPicker.handleNewSync(
             withCol { notetypes.clearCache() }
             notifySubscribersAllValuesChanged(deckPicker)
             refreshState()
+            val rewardUpdate = KioskManager.reconcileReviewedCardsFromCollection(deckPicker)
+            if (rewardUpdate != null && rewardUpdate.grantedMinutes > 0) {
+                deckPicker.showSnackbar(
+                    deckPicker.getString(
+                        R.string.kiosk_reward_earned_snackbar,
+                        rewardUpdate.grantedMinutes,
+                        KioskManager.formatDuration(rewardUpdate.totalBankedMillis),
+                    ),
+                ) {
+                    setAction(R.string.kiosk_mode) {
+                        KioskStatusDialogFragment.show(deckPicker.supportFragmentManager)
+                    }
+                }
+            }
         } finally {
             // Always update last sync time to prevent infinite retry loops
             // when sync fails (e.g., collection too large). See issue #19776

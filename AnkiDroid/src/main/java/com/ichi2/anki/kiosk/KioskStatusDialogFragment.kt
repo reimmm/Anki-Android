@@ -20,11 +20,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.ichi2.anki.R
 import com.ichi2.anki.common.utils.android.showThemedToast
 import com.ichi2.anki.kiosk.KioskQrScannerActivity.ScanMode
+import kotlinx.coroutines.launch
 
 /**
  * Control dialog for Kiosk mode: displays lock/break status, Device Owner status,
@@ -193,6 +195,13 @@ class KioskStatusDialogFragment : DialogFragment() {
         super.onStart()
         uiHandler.removeCallbacks(refreshTick)
         uiHandler.post(refreshTick)
+        lifecycleScope.launch {
+            val ctx = context ?: return@launch
+            KioskManager.reconcileReviewedCardsFromCollection(ctx)
+            if (isAdded && context != null) {
+                refreshUi()
+            }
+        }
     }
 
     override fun onStop() {
