@@ -7,7 +7,7 @@
 
 ## ダウンロード
 
-- **GitHub Releases（推奨）**: [`v2.25.3-aa.2`](https://github.com/reimmm/Anki-Android/releases/tag/v2.25.3-aa.2)
+- **GitHub Releases（推奨）**: [`v2.25.3-aa.3`](https://github.com/reimmm/Anki-Android/releases/tag/v2.25.3-aa.3)
 - **このブランチの最新 APK**: [`AnkiDroid-AA-arm64-v8a.apk`](./AnkiDroid-AA-arm64-v8a.apk)
 
 | 項目 | 値 |
@@ -15,10 +15,10 @@
 | ファイル名 | `AnkiDroid-AA-arm64-v8a.apk` |
 | アプリ名 / パッケージ名 | `AnkiDroid AA` / `com.ichi2.anki.autoadvance`（公式版と共存可） |
 | ベース / バージョン | `v2.25.3`（`versionCode = 322503300`） |
-| ソースコミット | [`de1e1ad479`](https://github.com/reimmm/Anki-Android/commit/de1e1ad479)（[`stable/v2.25.3-auto-advance`](https://github.com/reimmm/Anki-Android/tree/stable/v2.25.3-auto-advance)） |
+| ソースコミット | [`0674d9e602`](https://github.com/reimmm/Anki-Android/commit/0674d9e602)（[`stable/v2.25.3-auto-advance`](https://github.com/reimmm/Anki-Android/tree/stable/v2.25.3-auto-advance)） |
 | 対応 ABI / SDK | `arm64-v8a`（Android 7.0 `minSdk 24` 〜 Android 16 `targetSdk 36`） |
 | サイズ | `41,799,691 bytes`（約 39.9 MB） |
-| SHA-256 | `6d2848957138e1c4c1ed077981ca1b0aab0ea03c9f3170833d3d530441a1cdf0` |
+| SHA-256 | `92f4f6fb863170cbb03cc6bfdcbe3325834fb5e101b2633df4dbbcd9b431ee07` |
 
 ---
 
@@ -27,7 +27,7 @@
 1. **Kiosk モード（任意 QR ロック／解除 & 学習カード数に応じた自由時間）**
    - ADB の Device Owner 権限を用いて端末で AnkiDroid AA のみを起動する専用 Kiosk モードを搭載（音量ボタン・電源ボタンはロック中もそのまま使用可能）。
    - 任意の QR コードをスキャンして鍵として登録し、同じ QR コードでロック／解除（オフライン内蔵カメラ QR スキャナー）。
-   - 学習カード数に応じて他アプリを使える自由時間を獲得（デフォルト **100問 = 10分**、`gradle.properties` の `kioskRewardCards` / `kioskRewardMinutes` またはビルド時 `-P` オプションで変更可能）。
+   - 学習カード数に応じて他アプリを使える自由時間を獲得（デフォルト **100問 = 10分**、`gradle.properties` の `kioskRewardCards` / `kioskRewardMinutes` またはビルド時 `-P` オプションで変更可能）。**他端末（PC / iOS / Web 等）で学習して AnkiWeb Sync した分も `revlog` から自動反映**され、手動リスケジュール除外・Undo／再同期の二重付与防止・端末時計巻き戻し防止に対応。
    - Device Owner 初期設定コマンド（1回のみ）：
      ```bash
      adb shell dpm set-device-owner com.ichi2.anki.autoadvance/com.ichi2.anki.kiosk.KioskDeviceAdminReceiver
